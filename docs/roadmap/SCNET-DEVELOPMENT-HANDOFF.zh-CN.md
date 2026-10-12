@@ -52,7 +52,7 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `dsh-scnet` | `main` / `cf30c3d` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback 监听器、凭据存储适配器和受控 Python 解释器路径注入；`0.6.9` 已推送 Git，npm 发布待单独执行 |
+| `dsh-scnet` | `main` / `836c57e` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback 监听器、凭据存储适配器和受控 Python 解释器路径注入；`0.6.9` 已推送 Git，npm 发布待单独执行 |
 | `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页；默认激活并保留用户显式禁用状态 |
 | 上游临时验证树 | `f0ca86f` | 补丁 `0018`–`0021` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
