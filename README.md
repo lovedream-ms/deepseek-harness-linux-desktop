@@ -300,15 +300,17 @@ The workflow's jobs and what each one establishes:
 
 | Job | Establishes | Runs on |
 |---|---|---|
-| `install + typecheck + package preflight + Linux package smoke` | patches apply, typecheck and package preflight pass, deb build, installed deb starts and handles close/`dsh://` | push |
+| `install + typecheck + package preflight + Linux package smoke` | patches apply, typecheck and package preflight pass, deb build, installed deb starts and handles close/`dsh://` on Ubuntu 24.04 | push |
+| `Debian 13 and multi-distro package acceptance` | Debian 13 offline install, first launch, profile-state checks and purge; the deb is the exact artifact from the Ubuntu job | manual (`run-multidistro`) |
 | `upstream Linux gates, sandbox confinement, keyless agent smoke` | upstream's own Linux gate, bwrap/Landlock confinement, and a keyless agent turn | manual |
 | `deb upgrade path and AppArmor-hardened launch` | upgrading `…linux.2` → `…linux.3` cleans the legacy launcher, and the app starts under `kernel.apparmor_restrict_unprivileged_userns=1` **without** `--no-sandbox` | manual |
 | `Wayland` | the deb boots as a pure Wayland client under a headless compositor | manual |
 
 Removed, and what each cost:
 
-- `Debian 13 (trixie)` — duplicated the Ubuntu build chain in a container, and on branch runs
-  cloned the fork's remote default branch instead of checking out the commit under test.
+- `Debian 13 (trixie)` — a secondary distribution check. It downloads the exact deb built by
+  the Ubuntu job and runs only when the manual `run-multidistro` input is enabled, so a Debian
+  container or Docker-registry issue cannot block daily push verification.
 - `linux-gates-baseline` — the gate on the unpatched base tag. An attribution tool, useful while
   developing, not a gate.
 

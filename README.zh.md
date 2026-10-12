@@ -285,15 +285,16 @@ workflow 的各个 job 及其证明的事：
 
 | Job | 证明 | 触发时机 |
 |---|---|---|
-| `install + typecheck + package preflight + Linux package smoke` | 补丁能应用、类型检查/预检通过、deb 能构建，安装后的 deb 可启动并通过关窗/`dsh://` 检查 | push |
+| `install + typecheck + package preflight + Linux package smoke` | 补丁能应用、类型检查/预检通过、deb 能构建，Ubuntu 24.04 安装后的 deb 可启动并通过关窗/`dsh://` 检查 | push |
+| `Debian 13 and multi-distro package acceptance` | Debian 13 离线安装、首次启动、profile 状态和 purge；使用 Ubuntu job 生成的同一个 deb | 手动（`run-multidistro`） |
 | `upstream Linux gates, sandbox confinement, keyless agent smoke` | 上游自己的 Linux 门禁、bwrap/Landlock 隔离、以及一次无 key 的 agent 回合 | 手动 |
 | `deb upgrade path and AppArmor-hardened launch` | 从 `…linux.2` 升到 `…linux.3` 会清掉旧启动器；且在 `kernel.apparmor_restrict_unprivileged_userns=1` 下**不加** `--no-sandbox` 也能启动 | 手动 |
 | `Wayland` | deb 在 headless 合成器下以纯 Wayland 客户端启动 | 手动 |
 
 已移除的 job，以及各自的代价：
 
-- `Debian 13 (trixie)`：在容器里重复 Ubuntu 构建链；而且分支触发时会克隆 fork 远端默认分支，
-  并未检出本次待测提交。
+- `Debian 13 (trixie)`：作为次要发行版检查。它下载 Ubuntu job 生成的同一个 deb，仅在手动
+  勾选 `run-multidistro` 时运行，因此 Debian 容器或 Docker 镜像问题不会阻塞日常 push 验证。
 - `linux-gates-baseline`：在未打补丁的 base tag 上跑同一套门禁。纯归因工具，开发期有用，不构成
   门禁。
 

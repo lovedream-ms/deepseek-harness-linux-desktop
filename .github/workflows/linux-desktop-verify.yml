@@ -7,10 +7,9 @@ name: Linux desktop verification
 # A push applies, typechecks and builds this patch series. Longer upstream gates and checks against
 # already-published bytes are `workflow_dispatch` only -- run them before cutting a release.
 #
-# Pushes build and inspect the actual Linux package. The headless session checks startup, close
-# behaviour and dsh:// activation. Its plain-second-launch assertion is skipped in CI: Ubuntu and
-# Debian real desktop sessions passed this path, while Xvfb consistently fails it. Keep that
-# behaviour in the real-host acceptance checklist.
+# Pushes build and inspect the actual Linux package on Ubuntu 24.04. The headless session checks
+# startup, close behaviour and dsh:// activation. Debian and other distribution containers are
+# deliberately manual multi-distro checks so a secondary distribution cannot block daily changes.
 #
 # Real-desktop verification is the authority for window behaviour, not this workflow.
 
@@ -37,6 +36,10 @@ on:
         description: Smoke the published deb under a headless Wayland compositor
         type: boolean
         default: true
+      run-multidistro:
+        description: Run Debian 13 and other distribution container acceptance
+        type: boolean
+        default: false
       release-tag:
         description: Release tag whose published deb the published-artifact jobs verify
         type: string
@@ -174,16 +177,6 @@ jobs:
           dbus-run-session -- xvfb-run -a -s "-screen 0 1280x900x24" \
             bash "$GITHUB_WORKSPACE/ci/desktop-session.sh"
 
-      - name: Debian 13 offline install, first launch and uninstall
-        working-directory: ${{ env.UPSTREAM_DIR }}
-        run: |
-          set -euo pipefail
-          ART="apps/desktop/.desktop-build/targets/linux-x64/artifacts"
-          shopt -s nullglob
-          debs=("$ART"/*.deb)
-          test "${#debs[@]}" -eq 1
-          bash "$GITHUB_WORKSPACE/ci/debian13-offline.sh" "$PWD/${debs[0]}"
-
       - name: Collect diagnostics
         if: always()
         run: |
@@ -204,6 +197,34 @@ jobs:
             typecheck-summary.txt
             scnet-release-audit.json
           if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb-build
+          path: ${{ env.UPSTREAM_DIR }}/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
+          if-no-files-found: error
+
+  multidistro:
+    name: Debian 13 and multi-distro package acceptance
+    runs-on: ubuntu-24.04
+    needs: typecheck
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run-multidistro }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-deb-build
+          path: deb-artifacts
+
+      - name: Debian 13 offline install, first launch, profile state and uninstall
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(deb-artifacts/*.deb)
+          test "${#debs[@]}" -eq 1
+          bash ci/debian13-offline.sh "${debs[0]}"
 
   linux-gates:
     # Product-core coverage the packaging job does not reach: upstream's own Linux gate

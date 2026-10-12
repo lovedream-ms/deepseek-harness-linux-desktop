@@ -23,7 +23,8 @@
 - [x] 本地 SCNet 连接诊断页
 - [x] 22 个补丁在全新上游树重放
 - [x] Desktop 定向测试 `170/170` 和 host build
-- [x] Ubuntu 24.04 / Debian 13 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38223371667`）
+- [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38223371667`）
+- [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载曾在 Run `38223371667` 验收通过；后续作为手动多发行版 job，不再阻塞 push
 - [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
 - [ ] 自定义 profile 不被升级覆盖的发行包验收
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
@@ -214,7 +215,8 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 
 ### P1：完成 M1 离线验收
 
-- [x] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 离线安装、首次启动、`dsh://` 激活和卸载（Run `38223371667`）。
+- [x] 在全新 Ubuntu 24.04 环境完成 deb 安装、首次启动、`dsh://` 激活和卸载（Run `38223371667`）。
+- [x] Debian 13 同等验收已通过；后续由 `run-multidistro` 手动 job 复验，不作为日常阻塞门禁。
 - [ ] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 升级路径验收。
 - [ ] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill。
 - [ ] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖。
