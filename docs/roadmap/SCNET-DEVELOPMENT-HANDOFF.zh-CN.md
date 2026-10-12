@@ -23,8 +23,8 @@
 - [x] 本地 SCNet 连接诊断页
 - [x] 22 个补丁在全新上游树重放
 - [x] Desktop 定向测试 `170/170` 和 host build
-- [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38223371667`）
-- [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载曾在 Run `38223371667` 验收通过；后续作为手动多发行版 job，不再阻塞 push
+- [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
+- [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
 - [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
 - [ ] 自定义 profile 不被升级覆盖的发行包验收
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
@@ -149,12 +149,19 @@ Electron 的 Node 模式读取同一份 `app.asar`，验证：
 - packaged Electron 的 profile 激活断言命令通过。
 
 本机缺少 Xvfb、openbox、xdotool，且 sudo 需要交互密码，因此本轮没有执行 deb 安装后的完整
-GUI session。GitHub Actions Run `38223371667` 已通过 Ubuntu package smoke 与 Debian 13
-`--network none` 容器验收：离线安装、首次启动、Bundle/Skill 加载、`dsh://` 注册与激活、卸载均通过；
-容器按既有规则跳过 Xvfb 不可靠的普通第二次启动恢复断言。升级路径和自定义 profile 保留仍未关闭。
+GUI session。GitHub Actions Run `38233490072` 已通过 Ubuntu 24.04 push 基础门禁；手动
+多发行版 Run `38233720311` 使用 Ubuntu job 生成的同一个 deb，通过 Debian 13
+`--network none` 容器验收：离线安装、首次启动、Bundle/Skill、`dsh://` 注册与激活、显式
+禁用 profile 和卸载均通过。Debian job 仍按设计跳过 Xvfb 不可靠的普通第二次启动恢复断言，
+因此 Debian 只作为后续多发行版验收，不进入日常 push 阻塞链。
+
+手动 Run `38233714945` 通过已发布 `v0.2.0-rc.2-linux.3 -> v0.2.0-rc.2-linux.4` 的
+升级、旧 launcher 清理、AppArmor user namespace 限制下启动；该 job 对早期发布包使用
+`PROFILE_EXPECTATION=legacy`，不把尚未存在的 `dsh-scnet@0.6.8` 预置合同误报为回归。
+当前版本的 Ubuntu/Debian 升级路径和自定义 profile 保留仍未关闭。
 
 Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`；补丁 `0022` 显式声明
-`libasound2`，并在后续 Run `38223371667` 中得到验证。
+`libasound2`，并在后续 Run `38233720311` 中得到验证。
 
 ## 4. 当前边界与禁止事项
 
