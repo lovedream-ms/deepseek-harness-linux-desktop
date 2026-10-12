@@ -29,5 +29,10 @@ cp "$REPO_ROOT/ci/desktop-session.sh" "$CONTEXT/desktop-session.sh"
 cp "$DEB_FILE" "$CONTEXT/$DEB_NAME"
 
 docker build --pull --build-arg "DEB_FILE=$DEB_NAME" --tag "$IMAGE" "$CONTEXT"
-docker run --rm --network none --shm-size 512m "$IMAGE" session
+# Xvfb does not reliably model the plain second-launch restore path. That assertion is covered by
+# the real desktop-session jobs; keep the Debian container focused on offline install, first launch,
+# Bundle activation, dsh:// registration/activation, and removal.
+docker run --rm --network none --shm-size 512m \
+  -e SKIP_HEADLESS_RELAUNCH_CHECK=1 \
+  "$IMAGE" session
 docker run --rm --network none "$IMAGE" uninstall
