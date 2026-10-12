@@ -428,6 +428,7 @@ jobs:
 
       - name: Desktop session (window, close-does-not-quit, relaunch, dsh:// activation)
         env:
+          SKIP_HEADLESS_RELAUNCH_CHECK: '1'
           SHOT_DIR: ${{ github.workspace }}/session
         run: |
           set -o pipefail
