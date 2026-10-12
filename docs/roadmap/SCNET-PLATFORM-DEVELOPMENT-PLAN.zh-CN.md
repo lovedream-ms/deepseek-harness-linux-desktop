@@ -6,6 +6,55 @@
 - 适用仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`、上游 `deepseek-harness`
 - 目标发布线：Linux x64 Desktop 首发，随后扩展移动端与更多桌面发行版
 
+## 0.0 当前进度总览（checkbox）
+
+### M0：协议、合同与安全冻结
+
+- [ ] OAuth2/API 正式合同和安全评审完成（阻塞：等待 SCNet）
+- [ ] issuer、authorization/token/revoke/JWKS endpoint、scope 和 redirect URI 确认（阻塞：等待 SCNet）
+- [ ] client 注册、测试账户和 sandbox 凭证发放（阻塞：等待 SCNet）
+- [x] 未发布服务端免登手册已审阅，并明确不替代 OAuth2 + PKCE
+
+### M1：预制 `dsh-scnet` Bundle 与离线 Desktop
+
+- [x] 固定 `dsh-scnet@0.6.8`、完整性和许可证记录
+- [x] Desktop profile 默认激活，Web profile 保持显式安装
+- [x] 用户显式禁用状态跨升级保留
+- [x] Python 解释器路径注入和输入校验
+- [x] 本地只读 SCNet 连接诊断页
+- [x] 21 个补丁在全新上游树应用成功
+- [x] Desktop 定向测试 `170/170`，host build 通过
+- [ ] Ubuntu 24.04 / Debian 13 deb 安装、升级、卸载实机验收
+- [ ] 发布包敏感信息和 endpoint 扫描
+
+### M2：OAuth2 / Connector
+
+- [x] OAuth2 Authorization Code + PKCE 离线协议骨架
+- [x] state、issuer、redirect URI 校验
+- [x] callback 一次性消费、防重放和结构化错误
+- [x] 平台凭据存储适配器，无明文 fallback
+- [x] 协议无关 loopback callback 监听器（已进入 `dsh-scnet@0.6.9` Git 主线，npm 发布待执行）
+- [ ] 真实 issuer / endpoint 接入（阻塞：等待正式合同）
+- [ ] 真实 sandbox 登录、刷新、撤销（阻塞：等待凭证）
+- [ ] 账户关联 API（阻塞：等待正式合同）
+- [ ] 只读 OpenAPI 查询（阻塞：等待 sandbox）
+
+### M3：Linux Desktop 登录链路
+
+- [x] 本地 Bundle/Python/backend/凭据/认证诊断
+- [ ] Linux Secret Service/Keyring 实际适配
+- [x] loopback callback 协议层已具备
+- [ ] `dsh://auth/scnet` 深链注册和回调接线
+- [ ] login/refresh/logout/link/unlink UI 与 IPC
+- [ ] 锁屏、无 keyring、无桌面会话和凭据清理测试
+
+### M4-M6：移动端、平台扩展与稳定发布
+
+- [ ] Android OAuth2/OpenAPI connector 与 Keystore
+- [ ] iOS/HarmonyOS 最小连接器与安全存储
+- [ ] 信创 Linux/更多发行版能力矩阵
+- [ ] CI、安全响应、回滚包、兼容矩阵和稳定发布证据
+
 ## 0.1 结论摘要
 
 整体计划可行，但需要将原始目标改造成“一个认证协议、一个跨平台连接器契约、多个平台适配器”。预制 `dsh-scnet` 和 Linux Desktop 集成属于当前代码体系内的近期开工项；OAuth2 账户关联可实现，但前提是 SCNet 提供稳定的授权端点、scope、PKCE、token 刷新和账户关联接口；Android、iOS、HarmonyOS 不应直接运行当前 Node/Cordis + Python/Bash/SSH 插件，而应复用 OAuth2 和 OpenAPI 连接器。
@@ -208,7 +257,7 @@ Android 可以通过内置 connector tools 或受控远程 DSH Host 调用 SCNet
 4. 完成真实 SCNet 沙盒登录、刷新、注销和一个只读资源查询。
 5. 再开始 Android；移动端只复用协议和 OpenAPI connector，不复制桌面 shell 能力。
 
-当前进度：第 2 项的离线协议骨架、结构化错误、一次性回调会话和凭据存储适配接口已完成；
+当前进度：第 2 项的离线协议骨架、结构化错误、一次性回调会话、loopback 监听器和凭据存储适配接口已完成；
 第 3 项已完成 Desktop 预置的第一步，并已加入受控 Python 解释器路径注入。
 `dsh-scnet/connector` 提供版本化操作定义、平台能力状态、PKCE 授权请求、授权回调校验、
 token exchange/refresh 请求构造、一次性回调消费、结构化错误信封和平台凭据存储适配抽象；
