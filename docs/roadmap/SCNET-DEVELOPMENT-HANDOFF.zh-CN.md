@@ -21,9 +21,11 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 21 个补丁在全新上游树重放
+- [x] 22 个补丁在全新上游树重放
 - [x] Desktop 定向测试 `170/170` 和 host build
-- [ ] Ubuntu 24.04 / Debian 13 deb 安装、升级、卸载实机验收
+- [x] Ubuntu 24.04 / Debian 13 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38223371667`）
+- [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
+- [ ] 自定义 profile 不被升级覆盖的发行包验收
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
@@ -55,8 +57,8 @@
 | `scnet-hpc`（canonical） | `main` / `d4e88cc` | Skill、VERSION、发布文档和同步源；当前版本 `0.6.8` |
 | `dsh-scnet` | `main` / `f41c710` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入；版本 `0.6.8` |
 | `codex-scnet-hpc` | `main` / `5852229` | canonical Skill 同步后的 Codex skills-only Plugin；版本 `0.6.8` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页；默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `f0ca86f` | 补丁 `0018`–`0021` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖；默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `b5fff1d` | 补丁 `0018`–`0022` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
 
@@ -112,12 +114,13 @@ git diff --check
 启动竞态。它们与补丁 `0018` 修改的 bundle 准备、profile 初始化和迁移路径无关；后续升级
 上游基线时仍应重新确认。
 
-`0021` 的临时上游验证已通过：
+`0021` 的临时上游验证已通过，`0022` 在其基础上补充运行时依赖：
 
 - 新增 SCNet 状态读取、诊断窗口、preload 和静态 renderer 资源。
 - 定向 Desktop 测试 `170/170` 通过；新增测试覆盖 profile 禁用、Python 缺失、本地 metadata、
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
+- `0022` 的 Desktop 定向打包测试通过，并在生成 deb 的 control 字段中确认包含 `libasound2`。
 
 ### 3.3 M1 发行包审计
 
@@ -145,7 +148,12 @@ Electron 的 Node 模式读取同一份 `app.asar`，验证：
 - packaged Electron 的 profile 激活断言命令通过。
 
 本机缺少 Xvfb、openbox、xdotool，且 sudo 需要交互密码，因此本轮没有执行 deb 安装后的完整
-GUI session；安装、升级、卸载和首次启动网络隔离项仍由未关闭的 M1 验收项及 CI 负责。
+GUI session。GitHub Actions Run `38223371667` 已通过 Ubuntu package smoke 与 Debian 13
+`--network none` 容器验收：离线安装、首次启动、Bundle/Skill 加载、`dsh://` 注册与激活、卸载均通过；
+容器按既有规则跳过 Xvfb 不可靠的普通第二次启动恢复断言。升级路径和自定义 profile 保留仍未关闭。
+
+Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`；补丁 `0022` 显式声明
+`libasound2`，并在后续 Run `38223371667` 中得到验证。
 
 ## 4. 当前边界与禁止事项
 
@@ -206,7 +214,8 @@ GUI session；安装、升级、卸载和首次启动网络隔离项仍由未关
 
 ### P1：完成 M1 离线验收
 
-- [ ] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 离线安装、启动、升级和卸载。
+- [x] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 离线安装、首次启动、`dsh://` 激活和卸载（Run `38223371667`）。
+- [ ] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 升级路径验收。
 - [ ] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill。
 - [ ] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖。
 - [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。

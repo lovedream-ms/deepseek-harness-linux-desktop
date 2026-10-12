@@ -22,9 +22,11 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 解释器路径注入和输入校验
 - [x] 本地只读 SCNet 连接诊断页
-- [x] 21 个补丁在全新上游树应用成功
+- [x] 22 个补丁在全新上游树应用成功
 - [x] Desktop 定向测试 `170/170`，host build 通过
-- [ ] Ubuntu 24.04 / Debian 13 deb 安装、升级、卸载实机验收
+- [x] Ubuntu 24.04 / Debian 13 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38223371667`）
+- [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
+- [ ] 自定义 profile 不被升级覆盖的发行包验收
 - [x] 发布包敏感信息、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
@@ -266,6 +268,8 @@ Linux Desktop 补丁 `0018` 固定携带 `dsh-scnet@0.6.6`，补丁 `0019` 更�
 profile 自动迁移，并保留显式禁用状态。
 补丁 `0021` 增加应用菜单中的 SCNet 本地连接诊断页，展示 Bundle、Python、backend、凭据
 就绪和认证状态；诊断只读本地文件与运行时，不发起网络请求，也不向 renderer 暴露 token、
-AK/SK 或服务端免登凭证。
+AK/SK 或服务端免登凭证。补丁 `0022` 为 Electron 在干净 Debian/Ubuntu 安装中声明
+`libasound2` 运行时依赖；GitHub Actions Run `38223371667` 已通过 Ubuntu package smoke
+与 Debian 13 `--network none` 安装、首次启动、Bundle/Skill、`dsh://` 激活和卸载验收。
 Python/Keyring、深链回调和真实 SCNet issuer、scope、redirect URI、账户关联 endpoint
 仍待 M0 外部合同确认，因此当前实现不执行网络登录，也不代表 SCNet OAuth2 已完成。
