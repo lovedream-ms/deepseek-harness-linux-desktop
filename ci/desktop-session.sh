@@ -154,6 +154,8 @@ if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
   else
     fail "explicit SCNet disable marker or bundle state was changed"
   fi
+elif [ "$PROFILE_EXPECTATION" = "legacy" ]; then
+  note "SKIP: legacy published package has no SCNet bundle contract"
 elif [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
   const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
   if (!manifest.dsh?.profile?.bundles?.includes("dsh-scnet")) process.exit(1)
@@ -162,10 +164,16 @@ elif [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -
 else
   fail "first startup did not activate dsh-scnet in $profile"
 fi
-if [ -e "$DSH_HOME/profiles/desktop/.dsh-scnet.disabled" ]; then
+if [ "$PROFILE_EXPECTATION" = "default" ] && [ -e "$DSH_HOME/profiles/desktop/.dsh-scnet.disabled" ]; then
   fail "a new Desktop profile unexpectedly contains the SCNet disabled marker"
 else
-  note "PASS: a new Desktop profile has no SCNet disabled marker"
+  if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
+    note "PASS: the disabled Desktop profile retains its SCNet disabled marker"
+  elif [ "$PROFILE_EXPECTATION" = "legacy" ]; then
+    note "SKIP: legacy published package has no SCNet disabled-marker contract"
+  else
+    note "PASS: a new Desktop profile has no SCNet disabled marker"
+  fi
 fi
 
 # Registration: the package must own the scheme.

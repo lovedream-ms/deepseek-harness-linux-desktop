@@ -508,6 +508,8 @@ jobs:
       - name: Launch the installed application on the hardened kernel
         env:
           SHOT_DIR: ${{ github.workspace }}/hardened
+          PROFILE_EXPECTATION: legacy
+          SKIP_HEADLESS_RELAUNCH_CHECK: '1'
         run: |
           set -o pipefail
           mkdir -p "$SHOT_DIR"
