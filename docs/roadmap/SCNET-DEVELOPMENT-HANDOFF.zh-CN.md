@@ -1,6 +1,6 @@
 # SCNet 开发交接与后续 TODO
 
-- 交接日期：2026-10-10
+- 交接日期：2026-10-12
 - 当前状态：`in progress`
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
@@ -9,9 +9,9 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `dsh-scnet` | `main` / `65594f2` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、凭据存储抽象和包内容校验 |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018`：Desktop 固定预置 `dsh-scnet@0.6.6`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `36a594e` | 补丁 `0018` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `dsh-scnet` | `main` / `b3084df` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、凭据存储抽象，以及受控 Python 解释器路径注入 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `dsh-scnet@0.6.6`，补丁 `0019` 更新到 `dsh-scnet@0.6.7`，默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `dcd3703` | 补丁 `0018`、`0019` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
 
@@ -23,10 +23,13 @@
 - 实现 token 生命周期判断、并发刷新去重和内存凭据存储抽象。
 - 导出 `./connector`，并阻止 `__pycache__`、`.pyc` 等生成文件进入 npm 包。
 - 未绑定真实 SCNet endpoint、client ID、scope 或 UI，不代表真实 OAuth2 登录已经完成。
+- 本机脚本支持 `DSH_SCNET_PYTHON`（优先）或 `SCNET_PYTHON` 注入 Python 3 绝对路径；
+  会拒绝无效路径和 Python 2，不会把该路径传到远端计算节点。
 
-### 2.2 Linux Desktop 补丁 `0018`
+### 2.2 Linux Desktop 补丁 `0018` + `0019`
 
-- 构建时使用固定版本 `dsh-scnet@0.6.6`，记录包版本、完整性和许可证。
+- 构建时使用固定版本 `dsh-scnet@0.6.7`，记录包版本、完整性和许可证；`0018` 保留为
+  0.6.6 的历史预置，`0019` 完成版本切换。
 - 将固定包纳入 Desktop 本地 package set，首次启动不运行 pnpm，也不依赖 npm 网络。
 - 新安装的默认 Desktop profile 自动启用 `dsh-scnet`。
 - 旧默认 profile 自动迁移；用户显式禁用后写入 `.dsh-scnet.disabled`，后续升级不重新启用。
@@ -50,7 +53,7 @@ git diff --check
 
 ### 3.2 Linux Desktop
 
-补丁已在上游基线 `dsh-v0.2.0-rc.2` 上通过 `git am` 应用，并完成：
+补丁 `0018` 与 `0019` 已在上游基线 `dsh-v0.2.0-rc.2` 上通过 `git am` 应用，并完成：
 
 - 完整上游 `pnpm run typecheck`：通过。
 - 针对性 Desktop 测试：71 passed，1 skipped。
@@ -85,7 +88,7 @@ git diff --check
 - [ ] 接入 Linux Secret Service/Keyring，并验证锁屏、无 keyring、无桌面会话和凭据清理场景。
 - [ ] 实现 `dsh://auth/scnet` 深链回调及 `127.0.0.1` loopback 回退。
 - [ ] 将 connector 状态和 login/refresh/logout/link/unlink 接入 Desktop UI 与 IPC。
-- [ ] 为 `dsh-scnet` 增加受控 Python 路径注入，不假设系统存在 `python3`。
+- [x] 为 `dsh-scnet` 增加受控 Python 路径注入，不假设系统存在 `python3`。
 - [ ] 未登录、scope 不足、网络失败、区域错误和平台不支持均返回稳定的结构化错误。
 - [ ] 对日志、崩溃报告、session 和模型上下文执行凭据脱敏测试。
 
