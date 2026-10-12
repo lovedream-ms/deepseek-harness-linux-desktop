@@ -33,7 +33,7 @@
 - [x] state、issuer、redirect URI 校验
 - [x] callback 一次性消费、防重放和结构化错误
 - [x] 平台凭据存储适配器，无明文 fallback
-- [x] 协议无关 loopback callback 监听器（已进入 `dsh-scnet@0.6.9` Git 主线，npm 发布待执行）
+- [ ] 协议无关 loopback callback 监听器（需先按 canonical 下游同步流程进入 connector 发布）
 - [ ] 真实 issuer / endpoint 接入（阻塞：等待正式合同）
 - [ ] 真实 sandbox 登录、刷新、撤销（阻塞：等待凭证）
 - [ ] 账户关联 API（阻塞：等待正式合同）
@@ -43,7 +43,7 @@
 
 - [x] 本地 Bundle/Python/backend/凭据/认证诊断
 - [ ] Linux Secret Service/Keyring 实际适配
-- [x] loopback callback 协议层已具备
+- [ ] loopback callback 协议层已具备
 - [ ] `dsh://auth/scnet` 深链注册和回调接线
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
 - [ ] 锁屏、无 keyring、无桌面会话和凭据清理测试
@@ -257,7 +257,7 @@ Android 可以通过内置 connector tools 或受控远程 DSH Host 调用 SCNet
 4. 完成真实 SCNet 沙盒登录、刷新、注销和一个只读资源查询。
 5. 再开始 Android；移动端只复用协议和 OpenAPI connector，不复制桌面 shell 能力。
 
-当前进度：第 2 项的离线协议骨架、结构化错误、一次性回调会话、loopback 监听器和凭据存储适配接口已完成；
+当前进度：第 2 项的离线协议骨架、结构化错误、一次性回调会话和凭据存储适配接口已完成；
 第 3 项已完成 Desktop 预置的第一步，并已加入受控 Python 解释器路径注入。
 `dsh-scnet/connector` 提供版本化操作定义、平台能力状态、PKCE 授权请求、授权回调校验、
 token exchange/refresh 请求构造、一次性回调消费、结构化错误信封和平台凭据存储适配抽象；

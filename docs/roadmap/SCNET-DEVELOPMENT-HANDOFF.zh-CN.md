@@ -33,7 +33,7 @@
 - [x] callback 一次性消费和重放拒绝
 - [x] 稳定错误码和 JSON error envelope
 - [x] 凭据存储适配器接口，禁止明文回退
-- [x] 协议无关的 loopback callback 监听器（不绑定真实 endpoint）
+- [ ] 协议无关的 loopback callback 监听器（待 connector 发布流程纳入）
 - [ ] 真实 issuer / endpoint 接入（阻塞：等待合同）
 - [ ] 真实 sandbox 登录、刷新、撤销（阻塞：等待凭证）
 - [ ] 账户关联 API（阻塞：等待合同）
@@ -44,7 +44,7 @@
 - [x] 本地状态和诊断展示
 - [ ] Linux Secret Service/Keyring 实际 Desktop 适配
 - [ ] `dsh://auth/scnet` 回调
-- [x] loopback 回调协议层监听器
+- [ ] loopback 回调协议层监听器
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
 - [ ] 凭据清理、锁屏和无桌面会话测试
 
@@ -52,7 +52,7 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `dsh-scnet` | `main` / `836c57e` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback 监听器、凭据存储适配器和受控 Python 解释器路径注入；`0.6.9` 已推送 Git，npm 发布待单独执行 |
+| `dsh-scnet` | `main` / `46179cb` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入；内容按 canonical `scnet-hpc@0.6.8` 同步 |
 | `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页；默认激活并保留用户显式禁用状态 |
 | 上游临时验证树 | `f0ca86f` | 补丁 `0018`–`0021` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
@@ -94,7 +94,7 @@ git diff --check
 
 结果：
 
-- connector 全量测试 `26/26` 通过（包含 loopback callback、错误和凭据适配覆盖）。
+- connector 全量测试 `24/24` 通过（包含 callback、错误和凭据适配覆盖）。
 - npm dry-run 包校验通过，共 52 个文件，生成的 Python 文件为 0。
 - Git whitespace 检查通过。
 
@@ -124,8 +124,6 @@ git diff --check
 - OpenAPI 登录状态与 SSH 密钥/集群配置是独立状态，不得静默切换 backend 或互相冒充。
 - Linux 当前只发布 deb，不启用应用内自动更新。
 - 当前交付是离线 connector 骨架和固定 bundle 预置，不得对外宣称 SCNet 登录已完成。
-- `dsh-scnet@0.6.9` 当前已同步到 Git `main`，但尚未发布到 npm；Desktop 仍固定使用已发布的
-  `0.6.8`，避免构建阶段拉取不存在的包版本。
 - 当前诊断页是本地就绪检查，不是 SCNet 登录入口；在 M0 合同和凭证发放前不得把“需要授权”
   改成“已登录”，也不得根据手册示例值打开真实请求。
 
@@ -171,8 +169,8 @@ git diff --check
 - [x] 增加首个用户可见的 SCNet 本地诊断页，区分 Bundle、Python、backend、凭据和认证状态；
   真实登录按钮仍等待 M0 合同和凭证。
 - [x] 为 `dsh-scnet` 增加受控 Python 路径注入，不假设系统存在 `python3`。
-- [x] 增加协议无关的 loopback callback 监听器，校验固定路径、一次性消费和超时关闭；
-  Desktop 仍需在 M0 合同冻结后接入真实登录 UI。
+- [ ] 增加协议无关的 loopback callback 监听器，校验固定路径、一次性消费和超时关闭；
+  该项应先在 connector 发布流程中完成，再由 Desktop 接入。
 - [ ] 未登录、scope 不足、网络失败、区域错误和平台不支持均返回稳定的结构化错误。
 - [ ] 对日志、崩溃报告、session 和模型上下文执行凭据脱敏测试。
 
