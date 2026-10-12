@@ -136,6 +136,14 @@ else
   cat "$LOGROOT/31-inspection.log" | tee -a "$LOGROOT/summary.txt"
   grep -q "MISSING" "$LOGROOT/31-inspection.log" && fail "some expected Linux packages are missing" || pass "artifact contents look complete"
 
+  step "L2 SCNet release audit"
+  PACKAGE_SET="$UPSTREAM_DIR/apps/desktop/.desktop-build/targets/linux-x64/package-set"
+  if run "31-scnet-release-audit" node "$REPO_ROOT/ci/scnet-release-audit.mjs" \
+    --app "$APP" --package-set "$PACKAGE_SET" --expected-version 0.6.8 \
+    --output "$LOGROOT/scnet-release-audit.json"; then
+    cat "$LOGROOT/31-scnet-release-audit.log" | tee -a "$LOGROOT/summary.txt"
+  fi
+
   step "L3 headless runtime smoke"
   BIN="$APP/DeepSeek Harness"; [ -x "$BIN" ] || BIN="$APP/deepseek-harness"
   # The payload lives inside app.asar; Electron resolves the archive path itself.

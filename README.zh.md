@@ -190,9 +190,17 @@ ls -l "$ARTIFACTS/linux-unpacked/DeepSeek Harness"                   # Electron 
 ```sh
 pnpm --dir apps/desktop run package:linux:x64
 ls -l "$ARTIFACTS"/*.deb
+DEB=$(find "$ARTIFACTS" -maxdepth 1 -name '*.deb' -print -quit)
+node "$PATCH_REPO/ci/scnet-release-audit.mjs" \
+  --deb "$DEB" \
+  --package-set "$SRC/apps/desktop/.desktop-build/targets/linux-x64/package-set" \
+  --expected-version 0.6.8
 ```
 
-期望一个 deb 产物，名字来自产品版本（见 §6）。Linux 不做签名/公证，这里没有别的步骤。
+期望一个 deb 产物，名字来自产品版本（见 §6）。SCNet 发行审计使用产物自带的 Electron
+直接读取同一份 `app.asar`，核对固定 Bundle/Skill 版本、package-set 完整性与 MIT 许可证、
+runtime descriptor 哈希，并确认没有带值的凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
+Linux 不做签名/公证。
 
 想要自己的编号可加 `--build-version`，例如
 `pnpm --dir apps/desktop run package:linux:x64 -- --build-version 0.2.0-rc.2.linux.1`；

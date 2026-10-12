@@ -163,6 +163,11 @@ jobs:
           debs=("$ART"/*.deb)
           test "${#debs[@]}" -eq 1
           file "${debs[@]}"
+          node "$GITHUB_WORKSPACE/ci/scnet-release-audit.mjs" \
+            --deb "${debs[0]}" \
+            --package-set "apps/desktop/.desktop-build/targets/linux-x64/package-set" \
+            --expected-version 0.6.8 \
+            --output "$GITHUB_WORKSPACE/scnet-release-audit.json"
           sudo apt-get update -q
           sudo apt-get install -yq xvfb openbox xdotool dbus-x11 imagemagick libglib2.0-bin
           sudo apt-get install -yq "$PWD"/"${debs[0]}"
@@ -185,7 +190,9 @@ jobs:
         if: always()
         with:
           name: linux-verification-logs
-          path: typecheck-summary.txt
+          path: |
+            typecheck-summary.txt
+            scnet-release-audit.json
           if-no-files-found: warn
 
   linux-gates:

@@ -200,10 +200,18 @@ ls -l "$ARTIFACTS/linux-unpacked/DeepSeek Harness"                   # the Elect
 ```sh
 pnpm --dir apps/desktop run package:linux:x64
 ls -l "$ARTIFACTS"/*.deb
+DEB=$(find "$ARTIFACTS" -maxdepth 1 -name '*.deb' -print -quit)
+node "$PATCH_REPO/ci/scnet-release-audit.mjs" \
+  --deb "$DEB" \
+  --package-set "$SRC/apps/desktop/.desktop-build/targets/linux-x64/package-set" \
+  --expected-version 0.6.8
 ```
 
 Expect one deb artifact named from the product version (see [§6](#6-artifacts-and-where-they-land)).
-No signing or notarization runs for Linux, so nothing else is needed here.
+The SCNet release audit reads the exact `app.asar` with the packaged Electron runtime and verifies
+the fixed Bundle/Skill version, package-set integrity and MIT license, runtime descriptor hashes,
+and the absence of populated credentials, private endpoints, caches, `__pycache__`, and `.pyc`.
+No signing or notarization runs for Linux.
 
 Pass `--build-version` if you want your own numbering, e.g.
 `pnpm --dir apps/desktop run package:linux:x64 -- --build-version 0.2.0-rc.2.linux.1`;

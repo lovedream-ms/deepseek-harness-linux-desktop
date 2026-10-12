@@ -113,6 +113,14 @@ jobs:
         working-directory: ${{ env.UPSTREAM_DIR }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
+          debs=("$PWD"/publish/*.deb)
+          test "${#debs[@]}" -eq 1
+          node "$GITHUB_WORKSPACE/ci/scnet-release-audit.mjs" \
+            --deb "${debs[0]}" \
+            --package-set "apps/desktop/.desktop-build/targets/linux-x64/package-set" \
+            --expected-version 0.6.8 \
+            --output "$GITHUB_WORKSPACE/scnet-release-audit.json"
           sudo apt-get update -q
           sudo apt-get install -yq xvfb openbox xdotool dbus-x11 imagemagick libglib2.0-bin
           sudo apt-get install -yq "$PWD"/publish/*.deb
@@ -218,4 +226,5 @@ jobs:
             session-publish/*.log
             session-publish/*.png
             upstream/publish/SHA256SUMS
+            scnet-release-audit.json
           if-no-files-found: warn

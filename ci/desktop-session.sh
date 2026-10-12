@@ -19,6 +19,13 @@ APP_BIN=${APP_BIN:-/usr/bin/deepseek-harness}
 SHOT_DIR=${SHOT_DIR:-.}
 MIN_WINDOW_SIZE=${MIN_WINDOW_SIZE:-200}
 FAILED=0
+SESSION_HOME_CREATED=0
+if [ -z "${DSH_HOME:-}" ]; then
+  DSH_HOME=$(mktemp -d "${TMPDIR:-/tmp}/dsh-desktop-session.XXXXXX")
+  SESSION_HOME_CREATED=1
+fi
+export DSH_HOME
+export DSH_TELEMETRY_DISABLED=1
 # Electron refuses to start as root without --no-sandbox ("Running as root without --no-sandbox is
 # not supported"). Containers commonly run as root; the hosted runners do not.
 APP_ARGS=()
@@ -30,6 +37,13 @@ fi
 note() { echo "[session] $*"; }
 fail() { echo "[session] FAIL: $*"; FAILED=1; }
 known_issue() { echo "[session] KNOWN ISSUE: $*"; }
+
+cleanup() {
+  [ -n "${APP_PID:-}" ] && kill "$APP_PID" 2>/dev/null || true
+  [ -n "${WM_PID:-}" ] && kill "$WM_PID" 2>/dev/null || true
+  if [ "$SESSION_HOME_CREATED" -eq 1 ]; then rm -rf -- "$DSH_HOME"; fi
+}
+trap cleanup EXIT
 
 command -v xdotool >/dev/null || { echo "[session] FAIL: xdotool is required" >&2; exit 1; }
 
@@ -117,6 +131,21 @@ else
   fi
 fi
 
+profile="$DSH_HOME/profiles/desktop/package.json"
+if [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
+  const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+  if (!manifest.dsh?.profile?.bundles?.includes("dsh-scnet")) process.exit(1)
+' "$profile"; then
+  note "PASS: first startup activated dsh-scnet in the isolated Desktop profile"
+else
+  fail "first startup did not activate dsh-scnet in $profile"
+fi
+if [ -e "$DSH_HOME/profiles/desktop/.dsh-scnet.disabled" ]; then
+  fail "a new Desktop profile unexpectedly contains the SCNet disabled marker"
+else
+  note "PASS: a new Desktop profile has no SCNet disabled marker"
+fi
+
 # Registration: the package must own the scheme.
 handler=$(xdg-mime query default x-scheme-handler/dsh 2>/dev/null || true)
 if [ -n "$handler" ] && [ -f "/usr/share/applications/$handler" ]; then
@@ -190,9 +219,6 @@ else
 fi
 fi
 import -window root "$SHOT_DIR/session-relaunch.png" 2>/dev/null || true
-
-kill "$APP_PID" 2>/dev/null || true
-kill "$WM_PID" 2>/dev/null || true
 
 if [ "$FAILED" -eq 0 ]; then
   echo "SESSION RESULT: PASS"

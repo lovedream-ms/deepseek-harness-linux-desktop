@@ -25,7 +25,7 @@
 - [x] 21 个补丁在全新上游树应用成功
 - [x] Desktop 定向测试 `170/170`，host build 通过
 - [ ] Ubuntu 24.04 / Debian 13 deb 安装、升级、卸载实机验收
-- [ ] 发布包敏感信息和 endpoint 扫描
+- [x] 发布包敏感信息、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
 

@@ -24,7 +24,7 @@
 - [x] 21 个补丁在全新上游树重放
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [ ] Ubuntu 24.04 / Debian 13 deb 安装、升级、卸载实机验收
-- [ ] 发布包内容、凭据和内部 endpoint 扫描
+- [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
 
@@ -119,6 +119,34 @@ git diff --check
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
 
+### 3.3 M1 发行包审计
+
+新增 `ci/scnet-release-audit.mjs`，并接入 `verify.sh --full`、Linux Desktop 当前源码构建
+workflow 和新版本发布前 re-verification。脚本不下载 ASAR 工具，而是使用产物自带
+Electron 的 Node 模式读取同一份 `app.asar`，验证：
+
+- package-set 中 `dsh-scnet@0.6.8` 的 SHA-512、字节数和 MIT 许可证；
+- archived runtime、runtime descriptor、Bundle、`scnet-hpc` Skill 和 `VERSION` 一致；
+- Bundle 的 54 个文件逐个匹配 runtime descriptor 的 SHA-256 和字节数；
+- 不存在带值的 token、AK/SK、`appId`/`appSecret`、私钥、JWT、私网 endpoint；
+- 不存在 `clusters/.cache`、`__pycache__` 或 `.pyc`。
+
+2026-10-12 本地真实构建结果：
+
+- `pnpm --dir apps/desktop run package:linux:x64`：通过；
+- deb：`deepseek-harness-0.2.0-rc.2-linux-amd64.deb`，SHA-256
+  `3723dbe924a3f3ffb841e26505f950f4849bc2514a7fabf53d4989f8d4280cd6`；
+- `app.asar` SHA-256：`93b05653868135d06213834bf60068290d9390d40854bafeda3c4c2f6cd99f0f`；
+- `dsh-scnet-0.6.8.tgz` SHA-512：
+  `sha512-kMGiJ9whtNpE5uJ0DblcKGAnYZxjucMnN4GWEArxDdz2C+Ug5i12PbvdRyPC/MvHQkheK91AzxsJCGJm1bH+4Q==`；
+- unpacked app 与 deb 审计均通过；正例扫描 54 个文本文件，0 个敏感发现；
+- 反例 fixture 对 `.pyc` 缓存和带值 `access_token` 均按预期失败；
+- Desktop 定向测试 3 个文件通过，`42 passed / 1 skipped`；
+- packaged Electron 的 profile 激活断言命令通过。
+
+本机缺少 Xvfb、openbox、xdotool，且 sudo 需要交互密码，因此本轮没有执行 deb 安装后的完整
+GUI session；安装、升级、卸载和首次启动网络隔离项仍由未关闭的 M1 验收项及 CI 负责。
+
 ## 4. 当前边界与禁止事项
 
 - M0 外部合同尚未冻结，因此不得写入、猜测或硬编码 SCNet 内部 issuer、endpoint、client ID 或 scope。
@@ -181,7 +209,7 @@ git diff --check
 - [ ] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 离线安装、启动、升级和卸载。
 - [ ] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill。
 - [ ] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖。
-- [ ] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
+- [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
 - [ ] 将完整 deb 验收结果和 release artifact 校验值记录到发布证据中。
 
 ### P2：真实沙盒与后续平台
