@@ -1,0 +1,50 @@
+From b5fff1d9eb22b98308faa3adc0bd9836172ed62b Mon Sep 17 00:00:00 2001
+From: QILIN LU <luqilinheu@gmail.com>
+Date: Mon, 12 Oct 2026 15:45:14 +0800
+Subject: [PATCH 22/22] fix(desktop): declare the ALSA runtime dependency
+
+---
+ apps/desktop/scripts/electron-builder-config.mjs | 14 ++++++++++++++
+ apps/desktop/tests/installer-packaging.spec.ts   |  1 +
+ 2 files changed, 15 insertions(+)
+
+diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
+index c5c0607..4e7ba49 100644
+--- a/apps/desktop/scripts/electron-builder-config.mjs
++++ b/apps/desktop/scripts/electron-builder-config.mjs
+@@ -275,6 +275,20 @@ export function createElectronBuilderConfig(
+     },
+     deb: {
+       afterInstall: fileURLToPath(new URL('./linux-after-install.tpl', import.meta.url)),
++      // Electron links libasound directly. Keep electron-builder's defaults explicit so a clean
++      // Debian/Ubuntu installation also pulls the provider for libasound.so.2.
++      depends: [
++        'libgtk-3-0',
++        'libnotify4',
++        'libnss3',
++        'libxss1',
++        'libxtst6',
++        'xdg-utils',
++        'libatspi2.0-0',
++        'libuuid1',
++        'libsecret-1-0',
++        'libasound2',
++      ],
+     },
+     nsis: {
+       installerSidebar: join(buildPaths.root, 'installer-ui', 'uninstaller-sidebar.bmp'),
+diff --git a/apps/desktop/tests/installer-packaging.spec.ts b/apps/desktop/tests/installer-packaging.spec.ts
+index 1dc6eae..42ba38e 100644
+--- a/apps/desktop/tests/installer-packaging.spec.ts
++++ b/apps/desktop/tests/installer-packaging.spec.ts
+@@ -90,6 +90,7 @@ describe('installer preparation preserves application dependencies', () => {
+     }, 'linux', 'x64')
+     expect(config.linux.executableName).toBe('deepseek-harness')
+     expect(config.deb.afterInstall).toMatch(/linux-after-install\.tpl$/u)
++    expect(config.deb).toEqual(expect.objectContaining({ depends: expect.arrayContaining(['libasound2']) }))
+     expect(readFileSync(config.deb.afterInstall, 'utf8')).toContain('/usr/bin/DeepSeek Harness')
+   })
+ 
+-- 
+2.43.0
+
