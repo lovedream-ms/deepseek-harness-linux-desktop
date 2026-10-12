@@ -1,0 +1,39 @@
+From 65f40e1e87a217eb01fc4c56eba20b8cfa9bc6ca Mon Sep 17 00:00:00 2001
+From: linux-port <linux-port@localhost>
+Date: Mon, 12 Oct 2026 09:42:07 +0800
+Subject: [PATCH] build(desktop): update the SCNet bundle contract
+
+---
+ apps/desktop/src/scnet-bundle.ts                 | 2 +-
+ apps/desktop/tests/package-target-stages.spec.ts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/apps/desktop/src/scnet-bundle.ts b/apps/desktop/src/scnet-bundle.ts
+index 72886d8..febeb59 100644
+--- a/apps/desktop/src/scnet-bundle.ts
++++ b/apps/desktop/src/scnet-bundle.ts
+@@ -4,7 +4,7 @@
+ export const SCNET_BUNDLE_PACKAGE = 'dsh-scnet'
+ 
+ /** Exact published bundle version embedded in this Desktop release. */
+-export const SCNET_BUNDLE_VERSION = '0.6.7'
++export const SCNET_BUNDLE_VERSION = '0.6.8'
+ 
+ /** Package spec fetched only while assembling a Desktop release. */
+ export const SCNET_BUNDLE_SPEC = `${SCNET_BUNDLE_PACKAGE}@${SCNET_BUNDLE_VERSION}`
+diff --git a/apps/desktop/tests/package-target-stages.spec.ts b/apps/desktop/tests/package-target-stages.spec.ts
+index c4164e9..3b185b1 100644
+--- a/apps/desktop/tests/package-target-stages.spec.ts
++++ b/apps/desktop/tests/package-target-stages.spec.ts
+@@ -141,7 +141,7 @@ it.each([undefined, '2'])('passes macOS pack concurrency %s only to workspace pa
+   const packs = calls.filter(call => call[0].startsWith('run release:pack'))
+   expect(packs).toHaveLength(2)
+   expect(calls.map(call => call[0])).toContainEqual(expect.stringMatching(
+-    /^dlx npm@12 pack dsh-scnet@0\.6\.7 --pack-destination .*packed[/\\]scnet$/u,
++    /^dlx npm@12 pack dsh-scnet@0\.6\.8 --pack-destination .*packed[/\\]scnet$/u,
+   ))
+   for (const call of packs) expect(call[2].slice(-2)).toEqual(['--concurrency', concurrency ?? '4'])
+   for (const call of calls) {
+-- 
+2.43.0
+
