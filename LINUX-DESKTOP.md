@@ -2,7 +2,7 @@
 
 > 本文档对应的 Linux x64 路径已在本机实际编译、打包并启动验证，发布产物为 deb。
 > 另在 **ubuntu-24.04 与 Debian 13（trixie）** 的 GitHub Actions（workflow
-> `Linux desktop verification`）上完整跑通。当前仓库的补丁序列为 **20 个补丁**；
+> `Linux desktop verification`）上完整跑通。当前仓库的补丁序列为 **21 个补丁**；
 > 下述 run 是历史验证记录，完整门禁集
 > （run `37411910000`，2026-10-06，head `d70585e`）：8 个 job 中 7 个绿，涵盖
 > `install + typecheck + package preflight`、打包、Debian 13、deb 升级路径与硬化启动、

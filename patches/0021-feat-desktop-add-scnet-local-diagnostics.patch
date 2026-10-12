@@ -1,0 +1,854 @@
+From f4db922887c2afe6adb0e712ca80f6c5c30602d7 Mon Sep 17 00:00:00 2001
+From: QILIN LU <luqilinheu@gmail.com>
+Date: Mon, 12 Oct 2026 10:40:34 +0800
+Subject: [PATCH] feat(desktop): add SCNet local diagnostics
+
+---
+ apps/desktop/README.md                        |   2 +
+ apps/desktop/README.zh.md                     |   2 +
+ apps/desktop/renderer/scnet-diagnostics.css   |  42 +++++
+ apps/desktop/renderer/scnet-diagnostics.html  |  28 +++
+ apps/desktop/renderer/scnet-diagnostics.js    |  59 ++++++
+ .../scripts/electron-builder-config.mjs       |   1 +
+ apps/desktop/src/ipc.ts                       |   2 +
+ apps/desktop/src/locale.ts                    |  54 ++++++
+ apps/desktop/src/main.ts                      |   9 +
+ apps/desktop/src/preload-scnet-diagnostics.ts |  19 ++
+ apps/desktop/src/scnet-diagnostics-window.ts  |  99 ++++++++++
+ apps/desktop/src/scnet-diagnostics.ts         | 169 ++++++++++++++++++
+ apps/desktop/tests/main-startup.spec.ts       |   6 +-
+ .../tests/scnet-diagnostics-window.spec.ts    |  70 ++++++++
+ apps/desktop/tests/scnet-diagnostics.spec.ts  |  91 ++++++++++
+ apps/desktop/tsdown.config.ts                 |   2 +-
+ 16 files changed, 651 insertions(+), 4 deletions(-)
+ create mode 100644 apps/desktop/renderer/scnet-diagnostics.css
+ create mode 100644 apps/desktop/renderer/scnet-diagnostics.html
+ create mode 100644 apps/desktop/renderer/scnet-diagnostics.js
+ create mode 100644 apps/desktop/src/preload-scnet-diagnostics.ts
+ create mode 100644 apps/desktop/src/scnet-diagnostics-window.ts
+ create mode 100644 apps/desktop/src/scnet-diagnostics.ts
+ create mode 100644 apps/desktop/tests/scnet-diagnostics-window.spec.ts
+ create mode 100644 apps/desktop/tests/scnet-diagnostics.spec.ts
+
+diff --git a/apps/desktop/README.md b/apps/desktop/README.md
+index fa00c27..18be060 100644
+--- a/apps/desktop/README.md
++++ b/apps/desktop/README.md
+@@ -8,6 +8,8 @@ The desktop application is an Electron shell around the complete dsh Web applica
+ 
+ The first application-menu command, **About DeepSeek Harness**, opens Electron's native About panel with the application icon, product name, and installed release version. The menu follows the Desktop shell locale. On macOS, Hide, Hide Others, Show All, and Quit use localized labels; Hide and Quit include the DeepSeek Harness product name. These commands retain their native actions and shortcuts. macOS reads the icon from its application bundle, so an unpackaged development launch displays Electron's icon; Windows receives the packaged PNG.
+ 
++The application menu also provides **SCNet connection diagnostics…**. This shell-owned page checks the active `dsh-scnet` bundle, local Python 3 availability, backend metadata, and redacted credential readiness without contacting SCNet. It never displays or forwards access keys, secret keys, tokens, or the unissued server-side-login credentials described in the pending integration manual.
++
+ Desktop’s local native directory flow opens an Electron folder dialog attached to the application window, restoring, showing, and focusing that window first. Concurrent requests share one dialog; cancellation returns no path and failures remain retryable. Ordinary Web uses the Host chooser. Browse mode lists Host directories. On Linux without zenity or kdialog, automatic selection uses browse instead of the Electron dialog.
+ 
+ Creator and the Web Plugin Manager use Desktop’s bundled pnpm under Electron Node mode without requiring pnpm on PATH. The private Node launcher environment applies only to package operations.
+diff --git a/apps/desktop/README.zh.md b/apps/desktop/README.zh.md
+index 61caaf0..680fa93 100644
+--- a/apps/desktop/README.zh.md
++++ b/apps/desktop/README.zh.md
+@@ -8,6 +8,8 @@
+ 
+ 应用菜单第一项“**关于 DeepSeek Harness**”打开 Electron 原生关于面板，展示应用图标、产品名称和当前安装的发布版本。菜单文案跟随桌面壳的语言。macOS 的隐藏、隐藏其他、显示全部和退出条目使用本地化文案，隐藏和退出条目包含 DeepSeek Harness 产品名称。这些条目保留原生动作和快捷键。macOS 从应用包读取图标，因此未打包的开发启动会显示 Electron 图标；Windows 使用随包分发的 PNG。
+ 
++应用菜单还提供“**SCNet 连接诊断…**”。这个由壳拥有的页面会检查已激活的 `dsh-scnet` Bundle、本地 Python 3、backend 元数据和脱敏后的凭据就绪状态，不会连接 SCNet；它不会显示或转发 access key、secret key、token，也不会使用接入手册中尚未发放的服务端免登凭证。
++
+ Desktop 的本地原生目录流程打开绑定应用窗口的 Electron 文件夹对话框，并先恢复、显示和聚焦该窗口。并发请求共用一个对话框；取消不返回路径，失败后可以重试。普通 Web 使用 Host 选择器。浏览模式列出 Host 目录。Linux 缺少 zenity 或 kdialog 时，自动选择使用浏览模式，不使用 Electron 对话框。
+ 
+ Creator 和 Web Plugin Manager 在 Electron Node 模式下使用 Desktop 内置 pnpm，无需 PATH 中存在 pnpm。私有 Node 启动器环境仅应用于包操作。
+diff --git a/apps/desktop/renderer/scnet-diagnostics.css b/apps/desktop/renderer/scnet-diagnostics.css
+new file mode 100644
+index 0000000..b749b55
+--- /dev/null
++++ b/apps/desktop/renderer/scnet-diagnostics.css
+@@ -0,0 +1,42 @@
++@import url('./assets/window-material.css');
++
++:root {
++  color-scheme: light dark;
++  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++  color: #17191c;
++  background: #f8f9fa;
++}
++
++@media (prefers-color-scheme: dark) {
++  :root {
++    color: #f4f5f6;
++    background: #1b1c1f;
++  }
++}
++
++* { box-sizing: border-box; }
++body { margin: 0; min-width: 520px; min-height: 100vh; background: transparent; }
++main { min-height: 100vh; padding: 32px 36px 28px; background: var(--dsw-desktop-window-tint, transparent); }
++.topbar { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; padding-bottom: 24px; border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
++.eyebrow { margin: 0 0 6px; color: #777d84; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
++h1 { margin: 0; font-size: 25px; line-height: 32px; font-weight: 650; }
++.summary { max-width: 460px; margin: 7px 0 0; color: #686f76; font-size: 14px; line-height: 20px; }
++.actions { display: flex; gap: 8px; align-items: center; }
++button { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 7px; padding: 8px 13px; color: inherit; background: color-mix(in srgb, currentColor 4%, transparent); font: inherit; cursor: pointer; }
++button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
++button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
++#refresh { width: 36px; height: 36px; padding: 0; font-size: 20px; line-height: 1; }
++.checks { display: grid; gap: 10px; padding: 24px 0 14px; }
++.check { display: grid; grid-template-columns: 13px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 58px; padding: 12px 14px; border: 1px solid color-mix(in srgb, currentColor 12%, transparent); border-radius: 8px; background: color-mix(in srgb, currentColor 3%, transparent); }
++.dot { width: 9px; height: 9px; border-radius: 50%; background: #7c838b; }
++.check[data-state="ready"] .dot { background: #1f9d68; }
++.check[data-state="needs-setup"] .dot { background: #d28c24; }
++.check[data-state="disabled"] .dot { background: #8d9298; }
++.check[data-state="unavailable"] .dot { background: #c74b4b; }
++.check-name { font-size: 14px; font-weight: 600; }
++.check-detail { color: #737980; font-size: 13px; text-align: right; }
++.privacy { margin: 8px 0 0; color: #81868c; font-size: 12px; line-height: 18px; }
++@media (prefers-color-scheme: dark) {
++  .summary, .check-detail { color: #b1b6bc; }
++  .eyebrow, .privacy { color: #9298a0; }
++}
+diff --git a/apps/desktop/renderer/scnet-diagnostics.html b/apps/desktop/renderer/scnet-diagnostics.html
+new file mode 100644
+index 0000000..83335e5
+--- /dev/null
++++ b/apps/desktop/renderer/scnet-diagnostics.html
+@@ -0,0 +1,28 @@
++<!doctype html>
++<html lang="en">
++  <head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1">
++    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'none'; base-uri 'none'">
++    <title></title>
++    <link rel="stylesheet" href="scnet-diagnostics.css">
++  </head>
++  <body>
++    <main aria-labelledby="title">
++      <header class="topbar">
++        <div>
++          <p class="eyebrow" id="eyebrow"></p>
++          <h1 id="title"></h1>
++          <p class="summary" id="summary" role="status" aria-live="polite"></p>
++        </div>
++        <div class="actions">
++          <button id="refresh" type="button" aria-label="" title="">↻</button>
++          <button id="close" type="button"></button>
++        </div>
++      </header>
++      <section id="checks" class="checks" aria-label=""></section>
++      <p id="privacy" class="privacy"></p>
++    </main>
++    <script src="scnet-diagnostics.js"></script>
++  </body>
++</html>
+diff --git a/apps/desktop/renderer/scnet-diagnostics.js b/apps/desktop/renderer/scnet-diagnostics.js
+new file mode 100644
+index 0000000..a2e05ee
+--- /dev/null
++++ b/apps/desktop/renderer/scnet-diagnostics.js
+@@ -0,0 +1,59 @@
++(() => {
++  const api = window.dshScnetDiagnostics
++  if (!api) return
++  const m = api.locale.messages
++  document.documentElement.lang = api.locale.id
++  document.title = m.scnetDiagnosticsTitle
++  document.getElementById('eyebrow').textContent = m.scnetDiagnosticsEyebrow
++  document.getElementById('title').textContent = m.scnetDiagnosticsTitle
++  document.getElementById('refresh').ariaLabel = m.scnetDiagnosticsRefresh
++  document.getElementById('refresh').title = m.scnetDiagnosticsRefresh
++  document.getElementById('close').textContent = m.scnetDiagnosticsClose
++  document.getElementById('checks').ariaLabel = m.scnetDiagnosticsChecks
++  document.getElementById('privacy').textContent = m.scnetDiagnosticsPrivacy
++
++  const rows = [
++    ['bundle', m.scnetDiagnosticsBundle],
++    ['python', m.scnetDiagnosticsPython],
++    ['credentials', m.scnetDiagnosticsCredentials],
++    ['backend', m.scnetDiagnosticsBackend],
++    ['authentication', m.scnetDiagnosticsAuthentication],
++  ]
++  const checks = document.getElementById('checks')
++  const stateLabel = state => ({
++    ready: m.scnetDiagnosticsReady,
++    'needs-setup': m.scnetDiagnosticsNeedsSetup,
++    unavailable: m.scnetDiagnosticsUnavailable,
++    disabled: m.scnetDiagnosticsDisabled,
++  })[state] || m.scnetDiagnosticsUnavailable
++  const detail = (key, value) => {
++    if (key === 'bundle') return m.scnetDiagnosticsBundleVersion.replace('{version}', value)
++    if (key === 'python' && value.startsWith('Python 3')) return value
++    if (key === 'credentials') return value === 'configured' ? m.scnetDiagnosticsCredentialConfigured : value === 'not configured' ? m.scnetDiagnosticsCredentialMissing : m.scnetDiagnosticsSecureStore.replace('{provider}', value)
++    if (key === 'backend') return value === 'openapi' ? m.scnetDiagnosticsBackendOpenapi : value === 'ssh' ? m.scnetDiagnosticsBackendSsh : value
++    if (key === 'authentication') return value === 'authorization required' ? m.scnetDiagnosticsAuthorizationRequired : m.scnetDiagnosticsCredentialMissing
++    return value
++  }
++  const render = async () => {
++    const status = await api.read()
++    document.getElementById('summary').textContent = ({
++      ready: m.scnetDiagnosticsOverallReady,
++      'needs-setup': m.scnetDiagnosticsOverallNeedsSetup,
++      unavailable: m.scnetDiagnosticsOverallUnavailable,
++      disabled: m.scnetDiagnosticsOverallDisabled,
++    })[status.overall]
++    checks.replaceChildren(...rows.map(([key, label]) => {
++      const value = status[key]
++      const row = document.createElement('div')
++      row.className = 'check'
++      row.dataset.state = value.state
++      row.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="check-name"></span><span class="check-detail"></span>'
++      row.querySelector('.check-name').textContent = label
++      row.querySelector('.check-detail').textContent = value.state === 'ready' ? detail(key, value.detail) : stateLabel(value.state)
++      return row
++    }))
++  }
++  document.getElementById('refresh').addEventListener('click', () => { void render() })
++  document.getElementById('close').addEventListener('click', () => { void api.close() })
++  void render()
++})()
+diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
+index 4a28b36..c5c0607 100644
+--- a/apps/desktop/scripts/electron-builder-config.mjs
++++ b/apps/desktop/scripts/electron-builder-config.mjs
+@@ -140,6 +140,7 @@ export function createElectronBuilderConfig(
+       'lib/preload-platform-account.cjs',
+       'lib/preload-update-dialog.cjs',
+       'lib/preload-welcome.cjs',
++      'lib/preload-scnet-diagnostics.cjs',
+       'renderer/**/*',
+       'package.json',
+       { from: buildPaths.dsh, to: 'dsh', filter: ['**/*'] },
+diff --git a/apps/desktop/src/ipc.ts b/apps/desktop/src/ipc.ts
+index fc19021..9725318 100644
+--- a/apps/desktop/src/ipc.ts
++++ b/apps/desktop/src/ipc.ts
+@@ -31,6 +31,8 @@ export const DESKTOP_IPC = {
+   windowFullscreen: 'dsh-desktop:window-fullscreen',
+   windowsAppearance: 'dsh-desktop:windows-appearance',
+   windowsMenu: 'dsh-desktop:windows-menu',
++  scnetDiagnostics: 'dsh-desktop:scnet-diagnostics',
++  scnetDiagnosticsClose: 'dsh-desktop:scnet-diagnostics-close',
+ } as const
+ 
+ /** Desktop release update state rendered by desktop-owned UI. */
+diff --git a/apps/desktop/src/locale.ts b/apps/desktop/src/locale.ts
+index 14a1bc7..9f12746 100644
+--- a/apps/desktop/src/locale.ts
++++ b/apps/desktop/src/locale.ts
+@@ -99,6 +99,33 @@ export const en = {
+   welcomeKeyFailed: 'Could not save the API key. Please try again.',
+   welcomeContinueFailed: 'Could not open the workspace. Please try again.',
+   checkUpdatesMenu: 'Check for Updates…',
++  scnetDiagnosticsMenu: 'SCNet connection diagnostics…',
++  scnetDiagnosticsEyebrow: 'Local readiness',
++  scnetDiagnosticsTitle: 'SCNet diagnostics',
++  scnetDiagnosticsRefresh: 'Refresh',
++  scnetDiagnosticsClose: 'Close',
++  scnetDiagnosticsChecks: 'SCNet readiness checks',
++  scnetDiagnosticsBundle: 'SCNet bundle',
++  scnetDiagnosticsPython: 'Python runtime',
++  scnetDiagnosticsCredentials: 'Credentials',
++  scnetDiagnosticsBackend: 'Backend',
++  scnetDiagnosticsAuthentication: 'Authentication',
++  scnetDiagnosticsReady: 'Ready',
++  scnetDiagnosticsNeedsSetup: 'Needs setup',
++  scnetDiagnosticsUnavailable: 'Unavailable',
++  scnetDiagnosticsDisabled: 'Disabled',
++  scnetDiagnosticsBundleVersion: 'Version {version}',
++  scnetDiagnosticsCredentialConfigured: 'Configured locally',
++  scnetDiagnosticsCredentialMissing: 'Not configured',
++  scnetDiagnosticsSecureStore: '{provider} available; credentials not read',
++  scnetDiagnosticsBackendOpenapi: 'OpenAPI',
++  scnetDiagnosticsBackendSsh: 'SSH',
++  scnetDiagnosticsAuthorizationRequired: 'Authorization required',
++  scnetDiagnosticsOverallReady: 'The local SCNet integration is ready for an authorized operation.',
++  scnetDiagnosticsOverallNeedsSetup: 'SCNet is installed, but local setup or authorization is still required.',
++  scnetDiagnosticsOverallUnavailable: 'SCNet cannot run until the missing local dependency is available.',
++  scnetDiagnosticsOverallDisabled: 'The SCNet bundle is disabled for this Desktop profile.',
++  scnetDiagnosticsPrivacy: 'This page checks local files and runtime availability only. It does not contact SCNet or display credentials.',
+   reloadPageMenu: 'Reload Page',
+   restartAppHostMenu: 'Restart App and Host',
+   updateCheckFailedTitle: 'Update Check Failed',
+@@ -271,6 +298,33 @@ export const zh = {
+   welcomeKeyFailed: '无法保存 API 密钥，请重试。',
+   welcomeContinueFailed: '无法打开工作区，请重试。',
+   checkUpdatesMenu: '检查更新…',
++  scnetDiagnosticsMenu: 'SCNet 连接诊断…',
++  scnetDiagnosticsEyebrow: '本地就绪状态',
++  scnetDiagnosticsTitle: 'SCNet 诊断',
++  scnetDiagnosticsRefresh: '刷新',
++  scnetDiagnosticsClose: '关闭',
++  scnetDiagnosticsChecks: 'SCNet 就绪检查',
++  scnetDiagnosticsBundle: 'SCNet Bundle',
++  scnetDiagnosticsPython: 'Python 运行时',
++  scnetDiagnosticsCredentials: '凭据',
++  scnetDiagnosticsBackend: 'Backend',
++  scnetDiagnosticsAuthentication: '认证',
++  scnetDiagnosticsReady: '已就绪',
++  scnetDiagnosticsNeedsSetup: '需要配置',
++  scnetDiagnosticsUnavailable: '不可用',
++  scnetDiagnosticsDisabled: '已禁用',
++  scnetDiagnosticsBundleVersion: '版本 {version}',
++  scnetDiagnosticsCredentialConfigured: '本地已配置',
++  scnetDiagnosticsCredentialMissing: '未配置',
++  scnetDiagnosticsSecureStore: '检测到 {provider}，未读取凭据',
++  scnetDiagnosticsBackendOpenapi: 'OpenAPI',
++  scnetDiagnosticsBackendSsh: 'SSH',
++  scnetDiagnosticsAuthorizationRequired: '需要授权',
++  scnetDiagnosticsOverallReady: '本地 SCNet 集成已就绪，可以继续进行已授权操作。',
++  scnetDiagnosticsOverallNeedsSetup: 'SCNet 已安装，但仍需要完成本地配置或授权。',
++  scnetDiagnosticsOverallUnavailable: '缺少本地依赖，SCNet 暂时无法运行。',
++  scnetDiagnosticsOverallDisabled: '当前 Desktop profile 已禁用 SCNet Bundle。',
++  scnetDiagnosticsPrivacy: '此页面只检查本地文件和运行时，不会连接 SCNet，也不会显示凭据。',
+   reloadPageMenu: '刷新页面',
+   restartAppHostMenu: '重启应用与 Host',
+   updateCheckFailedTitle: '更新检查失败',
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 8097d59..5eb5cca 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -59,6 +59,8 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
+ import { DesktopQuitConfirmation } from './quit-confirmation.ts'
+ import { DesktopTray } from './tray.ts'
+ import { DesktopBackgroundNotice } from './background-notice.ts'
++import { openScnetDiagnosticsWindow } from './scnet-diagnostics-window.ts'
++import { readScnetDiagnostics } from './scnet-diagnostics.ts'
+ 
+ let focusPrimaryWindow = (): void => {}
+ let stopForRecovery = async (): Promise<void> => {}
+@@ -398,6 +400,11 @@ async function main(): Promise<void> {
+       detail: formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+       buttons: [locale.messages.updateAcknowledge], cancelId: 0 })
+   }
++  const showScnetDiagnostics = async (): Promise<void> => {
++    await openScnetDiagnosticsWindow(locale, {
++      read: () => readScnetDiagnostics({ profilePath: activeProject, environment: hostEnvironment }),
++    })
++  }
+   const commandManager = new DesktopCommandManager({
+     resources: process.resourcesPath,
+     isPackaged: app.isPackaged,
+@@ -969,6 +976,8 @@ async function main(): Promise<void> {
+       : { label: currentDesktopLocale().messages.aboutMenu, role: 'about' },
+     { type: 'separator' },
+     { label: currentDesktopLocale().messages.checkUpdatesMenu, click: () => { void openUpdatePrompt(true) } },
++    { label: currentDesktopLocale().messages.scnetDiagnosticsMenu,
++      click: () => { void showScnetDiagnostics().catch((error: unknown) => { console.error(error) }) } },
+     ...process.platform === 'darwin' || process.platform === 'win32'
+       ? [{ label: currentDesktopLocale().messages.cliCommandMenu, click: () => { void commandManager.show() } }] : [],
+     ...development ? [
+diff --git a/apps/desktop/src/preload-scnet-diagnostics.ts b/apps/desktop/src/preload-scnet-diagnostics.ts
+new file mode 100644
+index 0000000..3569e3d
+--- /dev/null
++++ b/apps/desktop/src/preload-scnet-diagnostics.ts
+@@ -0,0 +1,19 @@
++/** Isolated bridge for the local SCNet diagnostics document. */
++
++import { contextBridge, ipcRenderer } from 'electron'
++import { resolveDesktopLocale } from './locale.ts'
++import { DESKTOP_IPC } from './ipc.ts'
++import type { ScnetDiagnostics } from './scnet-diagnostics.ts'
++import type { ScnetDiagnosticsApi } from './scnet-diagnostics-window.ts'
++
++const prefix = '--dsh-scnet-locale='
++const locale = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length)
++if (locale === undefined) throw new Error('desktop SCNet diagnostics: missing window locale')
++
++const api: ScnetDiagnosticsApi = {
++  locale: resolveDesktopLocale(locale),
++  read: () => ipcRenderer.invoke(DESKTOP_IPC.scnetDiagnostics) as Promise<ScnetDiagnostics>,
++  close: () => ipcRenderer.invoke(DESKTOP_IPC.scnetDiagnosticsClose) as Promise<void>,
++}
++
++if (location.href === 'dsh-app://shell/scnet-diagnostics.html') contextBridge.exposeInMainWorld('dshScnetDiagnostics', api)
+diff --git a/apps/desktop/src/scnet-diagnostics-window.ts b/apps/desktop/src/scnet-diagnostics-window.ts
+new file mode 100644
+index 0000000..a24d69c
+--- /dev/null
++++ b/apps/desktop/src/scnet-diagnostics-window.ts
+@@ -0,0 +1,99 @@
++/** Native SCNet diagnostics window with a read-only, redacted status bridge. */
++
++import { fileURLToPath } from 'node:url'
++import { BrowserWindow, ipcMain, type BrowserWindowConstructorOptions, type IpcMainInvokeEvent } from 'electron'
++import type { DesktopLocale } from './locale.ts'
++import { DESKTOP_IPC } from './ipc.ts'
++import type { ScnetDiagnostics } from './scnet-diagnostics.ts'
++
++export interface ScnetDiagnosticsApi {
++  readonly locale: DesktopLocale
++  read(): Promise<ScnetDiagnostics>
++  close(): Promise<void>
++}
++
++interface ReadOperations {
++  read(): Promise<ScnetDiagnostics>
++}
++
++let activeWindow: BrowserWindow | undefined
++let disposeHandlers: (() => void) | undefined
++
++/**
++ * Build the fixed-size diagnostics window options.
++ * @param locale - Shell locale used by the isolated renderer.
++ * @returns Sandboxed options for the local diagnostics document.
++ */
++export function scnetDiagnosticsWindowOptions(locale: DesktopLocale): BrowserWindowConstructorOptions {
++  return {
++    width: 720,
++    height: 620,
++    useContentSize: true,
++    center: true,
++    resizable: true,
++    minimizable: false,
++    maximizable: false,
++    show: false,
++    title: locale.id === 'zh-CN' ? 'SCNet 连接诊断' : 'SCNet diagnostics',
++    webPreferences: {
++      preload: fileURLToPath(new URL('./preload-scnet-diagnostics.cjs', import.meta.url)),
++      additionalArguments: [`--dsh-scnet-locale=${locale.id}`],
++      nodeIntegration: false,
++      contextIsolation: true,
++      sandbox: true,
++      webSecurity: true,
++    },
++  }
++}
++
++/**
++ * Show or focus the single diagnostics window.
++ * @param locale - Current shell locale.
++ * @param operations - Local status reader.
++ * @returns The visible diagnostics window.
++ */
++export async function openScnetDiagnosticsWindow(locale: DesktopLocale, operations: ReadOperations): Promise<BrowserWindow> {
++  if (activeWindow !== undefined && !activeWindow.isDestroyed()) {
++    activeWindow.show()
++    activeWindow.focus()
++    return activeWindow
++  }
++  const window = new BrowserWindow(scnetDiagnosticsWindowOptions(locale))
++  activeWindow = window
++  disposeHandlers?.()
++  let active = true
++  const dispose = (): void => {
++    if (!active) return
++    active = false
++    ipcMain.removeHandler(DESKTOP_IPC.scnetDiagnostics)
++    ipcMain.removeHandler(DESKTOP_IPC.scnetDiagnosticsClose)
++    disposeHandlers = undefined
++    if (activeWindow === window) activeWindow = undefined
++  }
++  disposeHandlers = dispose
++  const assertSender = (event: IpcMainInvokeEvent): void => {
++    if (!active || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) {
++      throw new Error('desktop SCNet diagnostics: rejected action from an unowned frame')
++    }
++  }
++  ipcMain.handle(DESKTOP_IPC.scnetDiagnostics, (event) => {
++    assertSender(event)
++    return operations.read()
++  })
++  ipcMain.handle(DESKTOP_IPC.scnetDiagnosticsClose, (event) => {
++    assertSender(event)
++    if (!window.isDestroyed()) window.close()
++  })
++  window.once('closed', dispose)
++  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
++  window.webContents.on('will-navigate', (event) => { event.preventDefault() })
++  try {
++    await window.loadURL('dsh-app://shell/scnet-diagnostics.html')
++  } catch (error) {
++    dispose()
++    if (!window.isDestroyed()) window.destroy()
++    throw error
++  }
++  if (active && !window.isDestroyed()) window.show()
++  return window
++}
+diff --git a/apps/desktop/src/scnet-diagnostics.ts b/apps/desktop/src/scnet-diagnostics.ts
+new file mode 100644
+index 0000000..803af09
+--- /dev/null
++++ b/apps/desktop/src/scnet-diagnostics.ts
+@@ -0,0 +1,169 @@
++/** Local, redacted SCNet readiness facts used by the Desktop diagnostics window. */
++
++import { execFile as spawnFile } from 'node:child_process'
++import { existsSync, readFileSync, statSync } from 'node:fs'
++import { homedir } from 'node:os'
++import { delimiter, join } from 'node:path'
++import { promisify } from 'node:util'
++import { SCNET_BUNDLE_PACKAGE, SCNET_BUNDLE_VERSION } from './scnet-bundle.ts'
++
++const execFile = promisify(spawnFile)
++
++export type ScnetStatus = 'ready' | 'needs-setup' | 'unavailable' | 'disabled'
++
++export interface ScnetDiagnosticItem {
++  readonly state: 'ready' | 'needs-setup' | 'unavailable' | 'disabled'
++  readonly detail: string
++}
++
++export interface ScnetDiagnostics {
++  readonly overall: ScnetStatus
++  readonly bundle: ScnetDiagnosticItem
++  readonly python: ScnetDiagnosticItem
++  readonly credentials: ScnetDiagnosticItem
++  readonly backend: ScnetDiagnosticItem
++  readonly authentication: ScnetDiagnosticItem
++}
++
++interface ScnetProfile {
++  readonly active: boolean
++  readonly disabled: boolean
++}
++
++interface ScnetConfig {
++  readonly backend: string
++  readonly credentialsConfigured: boolean
++  readonly secureStore: string | undefined
++}
++
++interface PythonProbe {
++  readonly state: ScnetDiagnosticItem['state']
++  readonly executable?: string
++  readonly version?: string
++}
++
++export interface ScnetDiagnosticsDependencies {
++  readonly profilePath: string
++  readonly environment?: NodeJS.ProcessEnv
++  readonly bundleVersion?: string
++  readonly commandExists?: (command: string) => boolean
++  readonly probePython?: (candidates: readonly string[], environment: NodeJS.ProcessEnv) => Promise<PythonProbe>
++}
++
++function readProfile(profilePath: string): ScnetProfile {
++  const marker = join(profilePath, '.dsh-scnet.disabled')
++  if (existsSync(marker)) return { active: false, disabled: true }
++  try {
++    const manifest = JSON.parse(readFileSync(join(profilePath, 'package.json'), 'utf8')) as {
++      dsh?: { profile?: { bundles?: unknown } }
++    }
++    const bundles = manifest.dsh?.profile?.bundles
++    return {
++      active: Array.isArray(bundles) && bundles.includes(SCNET_BUNDLE_PACKAGE),
++      disabled: false,
++    }
++  } catch {
++    return { active: false, disabled: false }
++  }
++}
++
++function configRoot(environment: NodeJS.ProcessEnv): string {
++  const configured = environment.XDG_CONFIG_HOME?.trim()
++  return join(configured === undefined || configured === '' ? join(homedir(), '.config') : configured, 'scnet-hpc')
++}
++
++function readConfig(environment: NodeJS.ProcessEnv, commandExists: (command: string) => boolean): ScnetConfig {
++  const root = configRoot(environment)
++  let data: { DEFAULT_BACKEND?: unknown; openapi?: Record<string, unknown>; backend?: unknown } = {}
++  try {
++    const rootConfig = JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) as typeof data
++    if (rootConfig !== null && typeof rootConfig === 'object') data = rootConfig
++  } catch {
++    // Missing or malformed local configuration is represented as "needs setup".
++  }
++  const backend = String(environment.SCNET_HPC_BACKEND ?? data.DEFAULT_BACKEND ?? data.backend ?? 'openapi').trim().toLowerCase()
++  const hasEnvironmentCredentials = Boolean(
++    environment.SCNET_OPENAPI_TOKEN?.trim()
++    || (
++      environment.SCNET_OPENAPI_USER?.trim()
++      && environment.SCNET_OPENAPI_ACCESS_KEY?.trim()
++      && environment.SCNET_OPENAPI_SECRET_KEY?.trim()
++    ),
++  )
++  const secureStore = process.platform === 'darwin' && commandExists('security')
++    ? 'macOS Keychain'
++    : commandExists('secret-tool') ? 'Secret Service' : undefined
++  return {
++    backend,
++    credentialsConfigured: hasEnvironmentCredentials,
++    secureStore,
++  }
++}
++
++async function defaultProbePython(candidates: readonly string[], environment: NodeJS.ProcessEnv): Promise<PythonProbe> {
++  for (const executable of candidates) {
++    try {
++      const result = await execFile(executable, ['--version'], { env: environment, timeout: 3000, maxBuffer: 4096 })
++      const output = `${result.stdout}\n${result.stderr}`.trim()
++      const version = output.match(/\bPython\s+(3\.[0-9]+(?:\.[0-9]+)?)\b/u)?.[1]
++      if (version !== undefined) return { state: 'ready', executable, version }
++      return { state: 'unavailable' }
++    } catch (error) {
++      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
++      return { state: 'unavailable' }
++    }
++  }
++  return { state: 'unavailable' }
++}
++
++function pythonCandidates(environment: NodeJS.ProcessEnv): string[] {
++  const configured = environment.DSH_SCNET_PYTHON?.trim() || environment.SCNET_PYTHON?.trim()
++  return configured === undefined || configured === '' ? ['python3', 'python'] : [configured]
++}
++
++function item(state: ScnetDiagnosticItem['state'], detail: string): ScnetDiagnosticItem {
++  return { state, detail }
++}
++
++/**
++ * Read local SCNet readiness without contacting SCNet or returning credential values.
++ * @param dependencies - Desktop-owned paths, environment, and testable local probes.
++ * @returns Redacted status facts suitable for a renderer.
++ */
++export async function readScnetDiagnostics(dependencies: ScnetDiagnosticsDependencies): Promise<ScnetDiagnostics> {
++  const environment = dependencies.environment ?? process.env
++  const profile = readProfile(dependencies.profilePath)
++  const version = dependencies.bundleVersion ?? SCNET_BUNDLE_VERSION
++  const commandExists = dependencies.commandExists ?? ((command: string) => {
++    const path = environment.PATH ?? ''
++    return path.split(delimiter).some((directory) => {
++      try { return statSync(join(directory, command)).isFile() }
++      catch { return false }
++    })
++  })
++  const config = readConfig(environment, commandExists)
++  const python = await (dependencies.probePython ?? defaultProbePython)(pythonCandidates(environment), environment)
++  const bundle = profile.disabled
++    ? item('disabled', version)
++    : profile.active
++      ? item('ready', version)
++      : item('unavailable', version)
++  const pythonItem = python.state === 'ready'
++    ? item('ready', `${python.version ?? 'Python 3'}${python.executable === undefined ? '' : ` (${python.executable})`}`)
++    : item('unavailable', 'Python 3')
++  const credentials = config.credentialsConfigured
++    ? item('ready', 'configured')
++    : config.secureStore === undefined
++      ? item('needs-setup', 'not configured')
++      : item('needs-setup', config.secureStore)
++  const backend = config.backend === 'openapi' || config.backend === 'ssh'
++    ? item('ready', config.backend)
++    : item('unavailable', config.backend || 'unknown')
++  const authentication = config.credentialsConfigured
++    ? item('needs-setup', 'authorization required')
++    : item('needs-setup', 'not configured')
++  const overall = profile.disabled ? 'disabled'
++    : !profile.active || pythonItem.state === 'unavailable' ? 'unavailable'
++      : credentials.state === 'ready' ? 'ready' : 'needs-setup'
++  return { overall, bundle, python: pythonItem, credentials, backend, authentication }
++}
+diff --git a/apps/desktop/tests/main-startup.spec.ts b/apps/desktop/tests/main-startup.spec.ts
+index 25f78f7..5e86480 100644
+--- a/apps/desktop/tests/main-startup.spec.ts
++++ b/apps/desktop/tests/main-startup.spec.ts
+@@ -865,7 +865,7 @@ describe('desktop main startup', () => {
+     expect(() => handler(event, 'application', NaN, 34)).toThrow('invalid popup request')
+     const application = handler(event, 'application', 48, 34)
+     expect(harness.menu.buildFromTemplate.mock.lastCall![0].map(item => item.label ?? item.type)).toEqual([
+-      '关于 DeepSeek Harness', 'separator', '检查更新…', '管理 dsh 命令…', 'separator', '退出',
++      '关于 DeepSeek Harness', 'separator', '检查更新…', 'SCNet 连接诊断…', '管理 dsh 命令…', 'separator', '退出',
+     ])
+     expect(harness.popup.mock.lastCall![0]).toMatchObject({ window, x: 48, y: 34 })
+     expect(harness.popup.mock.lastCall![0].callback).toBeTypeOf('function')
+@@ -902,8 +902,8 @@ describe('desktop main startup', () => {
+       : ['Application', 'editMenu'])
+     const application = template[0]!.submenu as MenuItemConstructorOptions[]
+     expect(application.filter(item => item.visible !== false).map(describeItem)).toEqual(platform === 'darwin'
+-      ? ['about', 'separator', en.checkUpdatesMenu, en.cliCommandMenu, 'separator', 'hide', 'hideOthers', 'unhide', 'separator', 'quit']
+-      : ['about', 'separator', en.checkUpdatesMenu, 'separator', en.showWindowMenu, 'separator', 'quit'])
++      ? ['about', 'separator', en.checkUpdatesMenu, en.scnetDiagnosticsMenu, en.cliCommandMenu, 'separator', 'hide', 'hideOthers', 'unhide', 'separator', 'quit']
++      : ['about', 'separator', en.checkUpdatesMenu, en.scnetDiagnosticsMenu, 'separator', en.showWindowMenu, 'separator', 'quit'])
+     // Linux has no tray or Dock, so its quit entry carries the localized short label.
+     expect(application.find(item => item.role === 'quit')!.label)
+       .toBe(platform === 'darwin' ? en.quitApplication : en.quit)
+diff --git a/apps/desktop/tests/scnet-diagnostics-window.spec.ts b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+new file mode 100644
+index 0000000..5171507
+--- /dev/null
++++ b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+@@ -0,0 +1,70 @@
++import { afterEach, expect, it, vi } from 'vitest'
++import { resolveDesktopLocale } from '../src/locale.ts'
++import { DESKTOP_IPC } from '../src/ipc.ts'
++
++const fixture = await vi.hoisted(async () => {
++  const { EventEmitter } = await import('node:events')
++  const handlers = new Map<string, (...args: unknown[]) => unknown>()
++  const windows: FakeWindow[] = []
++  class FakeWindow extends EventEmitter {
++    destroyed = false
++    readonly webContents = Object.assign(new EventEmitter(), {
++      mainFrame: {},
++      setWindowOpenHandler: vi.fn(),
++    })
++    readonly loadURL = vi.fn(async () => {})
++    readonly show = vi.fn()
++    readonly focus = vi.fn()
++    constructor(readonly options: unknown) { super(); windows.push(this) }
++    isDestroyed() { return this.destroyed }
++    close() { this.destroyed = true; this.emit('closed') }
++    destroy() { this.close() }
++  }
++  return { handlers, windows, FakeWindow }
++})
++
++vi.mock('electron', () => ({
++  BrowserWindow: fixture.FakeWindow,
++  ipcMain: {
++    handle: (name: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(name, fn),
++    removeHandler: (name: string) => fixture.handlers.delete(name),
++  },
++}))
++
++const { openScnetDiagnosticsWindow, scnetDiagnosticsWindowOptions } = await import('../src/scnet-diagnostics-window.ts')
++
++afterEach(() => {
++  for (const window of fixture.windows) if (!window.isDestroyed()) window.close()
++  fixture.windows.length = 0
++  fixture.handlers.clear()
++})
++
++it('creates a sandboxed local diagnostics window', () => {
++  const options = scnetDiagnosticsWindowOptions(resolveDesktopLocale('zh-CN'))
++  expect(options).toMatchObject({
++    width: 720, height: 620, useContentSize: true, center: true, show: false,
++    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true },
++  })
++  expect(options.webPreferences?.preload).toMatch(/preload-scnet-diagnostics\.cjs$/u)
++})
++
++it('accepts status reads only from its own top frame and cleans up on close', async () => {
++  const window = await openScnetDiagnosticsWindow(resolveDesktopLocale('en'), {
++    read: async () => ({
++      overall: 'needs-setup',
++      bundle: { state: 'ready', detail: '0.6.8' },
++      python: { state: 'ready', detail: '3.12.1 (python3)' },
++      credentials: { state: 'needs-setup', detail: 'not configured' },
++      backend: { state: 'needs-setup', detail: 'openapi' },
++      authentication: { state: 'needs-setup', detail: 'not configured' },
++    }),
++  })
++  expect(window.loadURL).toHaveBeenCalledWith('dsh-app://shell/scnet-diagnostics.html')
++  const own = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
++  const read = fixture.handlers.get(DESKTOP_IPC.scnetDiagnostics)!
++  expect(() => read({ ...own, senderFrame: {} })).toThrow('unowned')
++  await expect(read(own)).resolves.toMatchObject({ overall: 'needs-setup' })
++  const close = fixture.handlers.get(DESKTOP_IPC.scnetDiagnosticsClose)!
++  await close(own)
++  expect(fixture.handlers.size).toBe(0)
++})
+diff --git a/apps/desktop/tests/scnet-diagnostics.spec.ts b/apps/desktop/tests/scnet-diagnostics.spec.ts
+new file mode 100644
+index 0000000..d6dc259
+--- /dev/null
++++ b/apps/desktop/tests/scnet-diagnostics.spec.ts
+@@ -0,0 +1,91 @@
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { tmpdir } from 'node:os'
++import { afterEach, describe, expect, it } from 'vitest'
++import { readScnetDiagnostics } from '../src/scnet-diagnostics.ts'
++
++const roots: string[] = []
++afterEach(() => {
++  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
++})
++
++function profile(bundles: string[], disabled = false): string {
++  const root = mkdtempSync(join(tmpdir(), 'dsh-scnet-diagnostics-'))
++  roots.push(root)
++  writeFileSync(join(root, 'package.json'), JSON.stringify({ dsh: { profile: { bundles } } }))
++  if (disabled) writeFileSync(join(root, '.dsh-scnet.disabled'), '0.6.8\n')
++  return root
++}
++
++const readyPython = async () => ({ state: 'ready' as const, executable: 'python3', version: '3.12.1' })
++
++describe('SCNet Desktop diagnostics', () => {
++  it('reports a ready bundle without exposing credential values', async () => {
++    const configHome = mkdtempSync(join(tmpdir(), 'dsh-scnet-config-'))
++    roots.push(configHome)
++    const result = await readScnetDiagnostics({
++      profilePath: profile(['@deepseek-ai/dsh-web-app', 'dsh-scnet']),
++      environment: {
++        XDG_CONFIG_HOME: configHome,
++        SCNET_OPENAPI_USER: 'private-user',
++        SCNET_OPENAPI_ACCESS_KEY: 'private-access',
++        SCNET_OPENAPI_SECRET_KEY: 'private-secret',
++        PATH: '',
++      },
++      probePython: readyPython,
++      commandExists: () => false,
++    })
++    expect(result).toEqual({
++      overall: 'ready',
++      bundle: { state: 'ready', detail: '0.6.8' },
++      python: { state: 'ready', detail: '3.12.1 (python3)' },
++      credentials: { state: 'ready', detail: 'configured' },
++      backend: { state: 'ready', detail: 'openapi' },
++      authentication: { state: 'needs-setup', detail: 'authorization required' },
++    })
++    expect(JSON.stringify(result)).not.toContain('private-')
++  })
++
++  it('distinguishes disabled profiles and missing local setup', async () => {
++    const configHome = mkdtempSync(join(tmpdir(), 'dsh-scnet-config-'))
++    roots.push(configHome)
++    const result = await readScnetDiagnostics({
++      profilePath: profile(['@deepseek-ai/dsh-web-app', 'dsh-scnet'], true),
++      environment: { XDG_CONFIG_HOME: configHome, PATH: '' },
++      probePython: async () => ({ state: 'unavailable' as const }),
++      commandExists: () => false,
++    })
++    expect(result.overall).toBe('disabled')
++    expect(result.bundle).toEqual({ state: 'disabled', detail: '0.6.8' })
++    expect(result.credentials).toEqual({ state: 'needs-setup', detail: 'not configured' })
++  })
++
++  it('reports unavailable Python separately from an active bundle', async () => {
++    const root = profile(['dsh-scnet'])
++    const result = await readScnetDiagnostics({
++      profilePath: root,
++      environment: { PATH: '' },
++      probePython: async () => ({ state: 'unavailable' as const }),
++      commandExists: () => false,
++    })
++    expect(result.overall).toBe('unavailable')
++    expect(result.bundle.state).toBe('ready')
++    expect(result.python.state).toBe('unavailable')
++  })
++
++  it('reads only backend metadata from the local config', async () => {
++    const configHome = mkdtempSync(join(tmpdir(), 'dsh-scnet-config-'))
++    roots.push(configHome)
++    const root = join(configHome, 'scnet-hpc')
++    mkdirSync(root)
++    writeFileSync(join(root, 'config.json'), JSON.stringify({ DEFAULT_BACKEND: 'ssh' }))
++    const result = await readScnetDiagnostics({
++      profilePath: profile(['dsh-scnet']),
++      environment: { XDG_CONFIG_HOME: configHome, PATH: '' },
++      probePython: readyPython,
++      commandExists: () => false,
++    })
++    expect(result.backend).toEqual({ state: 'ready', detail: 'ssh' })
++    expect(result.authentication).toEqual({ state: 'needs-setup', detail: 'not configured' })
++  })
++})
+diff --git a/apps/desktop/tsdown.config.ts b/apps/desktop/tsdown.config.ts
+index d8470ba..37a9a7f 100644
+--- a/apps/desktop/tsdown.config.ts
++++ b/apps/desktop/tsdown.config.ts
+@@ -90,7 +90,7 @@ export default defineConfig([
+     clean: false,
+     deps: { neverBundle: ['electron'] },
+   },
+-  ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog'] as const).map(name => ({
++  ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog', 'preload-scnet-diagnostics'] as const).map(name => ({
+     // Sandboxed Electron preloads run as CommonJS even though the application package is ESM.
+     entry: { [name]: `lib/types/${name}.js` },
+     plugins: [packagedImportsPlugin(preloadImports)],
+-- 
+2.43.0
+

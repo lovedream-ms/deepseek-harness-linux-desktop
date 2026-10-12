@@ -10,8 +10,8 @@
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
 | `dsh-scnet` | `main` / `46179cb` | SCNet connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入 |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `65f40e1` | 补丁 `0018`、`0019`、`0020` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页；默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `f0ca86f` | 补丁 `0018`–`0021` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
 
@@ -36,6 +36,8 @@
 - 新安装的默认 Desktop profile 自动启用 `dsh-scnet`。
 - 旧默认 profile 自动迁移；用户显式禁用后写入 `.dsh-scnet.disabled`，后续升级不重新启用。
 - Web profile 仍保持显式安装，不自动加入 `dsh-scnet`。
+- 应用菜单新增“SCNet 连接诊断…”，显示 Bundle、Python、backend、凭据就绪和认证状态；诊断只读本地信息，不发起网络请求。
+- 诊断窗口通过隔离 preload 和来源校验提供状态，不向 renderer 暴露 token、AK/SK 或服务端免登凭证；在未收到正式合同/凭证时，认证状态保持“需要授权”。
 
 ## 3. 验证证据
 
@@ -65,6 +67,13 @@ git diff --check
 启动竞态。它们与补丁 `0018` 修改的 bundle 准备、profile 初始化和迁移路径无关；后续升级
 上游基线时仍应重新确认。
 
+`0021` 的临时上游验证已通过：
+
+- 新增 SCNet 状态读取、诊断窗口、preload 和静态 renderer 资源。
+- 定向 Desktop 测试 `170/170` 通过；新增测试覆盖 profile 禁用、Python 缺失、本地 metadata、
+  IPC 来源校验和凭据脱敏。
+- `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
+
 ## 4. 当前边界与禁止事项
 
 - M0 外部合同尚未冻结，因此不得写入、猜测或硬编码 SCNet 内部 issuer、endpoint、client ID 或 scope。
@@ -72,6 +81,8 @@ git diff --check
 - OpenAPI 登录状态与 SSH 密钥/集群配置是独立状态，不得静默切换 backend 或互相冒充。
 - Linux 当前只发布 deb，不启用应用内自动更新。
 - 当前交付是离线 connector 骨架和固定 bundle 预置，不得对外宣称 SCNet 登录已完成。
+- 当前诊断页是本地就绪检查，不是 SCNet 登录入口；在 M0 合同和凭证发放前不得把“需要授权”
+  改成“已登录”，也不得根据手册示例值打开真实请求。
 
 ## 5. 新收到的接入手册证据
 
@@ -112,6 +123,8 @@ git diff --check
 - [ ] 接入 Linux Secret Service/Keyring，并验证锁屏、无 keyring、无桌面会话和凭据清理场景。
 - [ ] 实现 `dsh://auth/scnet` 深链回调及 `127.0.0.1` loopback 回退。
 - [ ] 将 connector 状态和 login/refresh/logout/link/unlink 接入 Desktop UI 与 IPC。
+- [x] 增加首个用户可见的 SCNet 本地诊断页，区分 Bundle、Python、backend、凭据和认证状态；
+  真实登录按钮仍等待 M0 合同和凭证。
 - [x] 为 `dsh-scnet` 增加受控 Python 路径注入，不假设系统存在 `python3`。
 - [ ] 未登录、scope 不足、网络失败、区域错误和平台不支持均返回稳定的结构化错误。
 - [ ] 对日志、崩溃报告、session 和模型上下文执行凭据脱敏测试。

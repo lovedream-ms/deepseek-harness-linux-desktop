@@ -215,5 +215,8 @@ token exchange/refresh 请求构造、一次性回调消费、结构化错误信
 Linux Desktop 补丁 `0018` 固定携带 `dsh-scnet@0.6.6`，补丁 `0019` 更新到
 `dsh-scnet@0.6.7`，补丁 `0020` 更新到 `dsh-scnet@0.6.8`，首次启动默认激活、旧默认
 profile 自动迁移，并保留显式禁用状态。
+补丁 `0021` 增加应用菜单中的 SCNet 本地连接诊断页，展示 Bundle、Python、backend、凭据
+就绪和认证状态；诊断只读本地文件与运行时，不发起网络请求，也不向 renderer 暴露 token、
+AK/SK 或服务端免登凭证。
 Python/Keyring、深链回调和真实 SCNet issuer、scope、redirect URI、账户关联 endpoint
 仍待 M0 外部合同确认，因此当前实现不执行网络登录，也不代表 SCNet OAuth2 已完成。
