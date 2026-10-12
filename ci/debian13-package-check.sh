@@ -43,6 +43,14 @@ session_check() {
   timeout 180 dbus-run-session -- xvfb-run -a -s '-screen 0 1280x900x24' \
     /usr/local/bin/desktop-session.sh
   echo "PASS: Debian 13 installed session starts offline with dsh-scnet active"
+
+  rm -rf /tmp/dsh-disabled-home /tmp/dsh-disabled-session
+  DSH_HOME=/tmp/dsh-disabled-home \
+    SHOT_DIR=/tmp/dsh-disabled-session \
+    PROFILE_EXPECTATION=disabled \
+    timeout 180 dbus-run-session -- xvfb-run -a -s '-screen 0 1280x900x24' \
+      /usr/local/bin/desktop-session.sh
+  echo "PASS: Debian 13 profile initialization preserves explicit SCNet disable"
 }
 
 uninstall_check() {

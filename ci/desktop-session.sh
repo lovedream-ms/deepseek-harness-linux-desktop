@@ -18,6 +18,7 @@ set -uo pipefail
 APP_BIN=${APP_BIN:-/usr/bin/deepseek-harness}
 SHOT_DIR=${SHOT_DIR:-.}
 MIN_WINDOW_SIZE=${MIN_WINDOW_SIZE:-200}
+PROFILE_EXPECTATION=${PROFILE_EXPECTATION:-default}
 FAILED=0
 SESSION_HOME_CREATED=0
 if [ -z "${DSH_HOME:-}" ]; then
@@ -26,6 +27,13 @@ if [ -z "${DSH_HOME:-}" ]; then
 fi
 export DSH_HOME
 export DSH_TELEMETRY_DISABLED=1
+
+if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
+  mkdir -p "$DSH_HOME/profiles/desktop"
+  printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app"]}}}' \
+    >"$DSH_HOME/profiles/desktop/package.json"
+  printf '%s\n' '0.6.8' >"$DSH_HOME/profiles/desktop/.dsh-scnet.disabled"
+fi
 # Electron refuses to start as root without --no-sandbox ("Running as root without --no-sandbox is
 # not supported"). Containers commonly run as root; the hosted runners do not.
 APP_ARGS=()
@@ -132,7 +140,21 @@ else
 fi
 
 profile="$DSH_HOME/profiles/desktop/package.json"
-if [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
+profile_bundles() {
+  ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
+    const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+    process.stdout.write(JSON.stringify(manifest.dsh?.profile?.bundles ?? []))
+  ' "$profile"
+}
+if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
+  bundles=$(profile_bundles)
+  if [ -f "$profile" ] && [ -e "$DSH_HOME/profiles/desktop/.dsh-scnet.disabled" ] \
+    && [[ "$bundles" != *'"dsh-scnet"'* ]]; then
+    note "PASS: explicit SCNet disable marker survived profile initialization"
+  else
+    fail "explicit SCNet disable marker or bundle state was changed"
+  fi
+elif [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
   const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
   if (!manifest.dsh?.profile?.bundles?.includes("dsh-scnet")) process.exit(1)
 ' "$profile"; then
