@@ -25,8 +25,9 @@
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
-- [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
-- [ ] 自定义 profile 不被升级覆盖的发行包验收
+- [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
+- [ ] Debian 13 候选升级路径验收（后续手动多发行版阶段，非日常阻塞项）
+- [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
@@ -158,7 +159,13 @@ GUI session。GitHub Actions Run `38233490072` 已通过 Ubuntu 24.04 push 基�
 手动 Run `38233714945` 通过已发布 `v0.2.0-rc.2-linux.3 -> v0.2.0-rc.2-linux.4` 的
 升级、旧 launcher 清理、AppArmor user namespace 限制下启动；该 job 对早期发布包使用
 `PROFILE_EXPECTATION=legacy`，不把尚未存在的 `dsh-scnet@0.6.8` 预置合同误报为回归。
-当前版本的 Ubuntu/Debian 升级路径和自定义 profile 保留仍未关闭。
+该次验收针对旧版已发布包的兼容启动，不代表当前候选包的 profile 迁移；当前候选包的
+Ubuntu 迁移由后续 Run `38336572137` 单独覆盖，Debian 迁移仍留在多发行版阶段。
+
+手动 Run `38336572137` 进一步使用已发布 `v0.2.0-rc.2-linux.4` 和同一运行中构建的当前
+候选 deb，在 Ubuntu 24.04 完成包替换、旧 launcher 清理和三类 profile 验收：旧默认
+profile 自动加入 `dsh-scnet`，显式禁用 marker 和无 Bundle 状态保持，自定义 bundles 及
+自定义字段不被覆盖。Ubuntu 当前候选升级已关闭；Debian 升级留到后续手动多发行版阶段。
 
 Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`；补丁 `0022` 显式声明
 `libasound2`，并在后续 Run `38233720311` 中得到验证。
@@ -222,11 +229,12 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 
 ### P1：完成 M1 离线验收
 
-- [x] 在全新 Ubuntu 24.04 环境完成 deb 安装、首次启动、`dsh://` 激活和卸载（Run `38223371667`）。
-- [x] Debian 13 同等验收已通过；后续由 `run-multidistro` 手动 job 复验，不作为日常阻塞门禁。
-- [ ] 在全新 Ubuntu 24.04 和 Debian 13 环境完成 deb 升级路径验收。
-- [ ] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill。
-- [ ] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖。
+- [x] 在全新 Ubuntu 24.04 环境完成 deb 安装、首次启动、`dsh://` 激活和卸载（Run `38233490072`）。
+- [x] Debian 13 同等验收已通过（Run `38233720311`）；后续由 `run-multidistro` 手动 job 复验，不作为日常阻塞门禁。
+- [x] 在 Ubuntu 24.04 完成公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）。
+- [ ] 在 Debian 13 完成候选 deb 升级路径验收（后续多发行版阶段，非阻塞）。
+- [x] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill（Run `38233720311`）。
+- [x] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖（Run `38336572137`）。
 - [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
 - [ ] 将完整 deb 验收结果和 release artifact 校验值记录到发布证据中。
 

@@ -26,8 +26,9 @@
 - [x] Desktop 定向测试 `170/170`，host build 通过
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38233490072`）
 - [x] Debian 13 同等验收在手动多发行版 Run `38233720311` 通过；不作为日常 push 阻塞
-- [ ] Ubuntu 24.04 / Debian 13 deb 升级路径验收
-- [ ] 自定义 profile 不被升级覆盖的发行包验收
+- [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
+- [ ] Debian 13 候选升级路径验收（后续手动多发行版阶段，非日常阻塞项）
+- [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包敏感信息、内部 endpoint、缓存和生成文件扫描
 
 ### M2：OAuth2 / Connector
@@ -270,7 +271,9 @@ profile 自动迁移，并保留显式禁用状态。
 补丁 `0021` 增加应用菜单中的 SCNet 本地连接诊断页，展示 Bundle、Python、backend、凭据
 就绪和认证状态；诊断只读本地文件与运行时，不发起网络请求，也不向 renderer 暴露 token、
 AK/SK 或服务端免登凭证。补丁 `0022` 为 Electron 在干净 Debian/Ubuntu 安装中声明
-`libasound2` 运行时依赖；GitHub Actions Run `38223371667` 已通过 Ubuntu package smoke
-与 Debian 13 `--network none` 安装、首次启动、Bundle/Skill、`dsh://` 激活和卸载验收。
+`libasound2` 运行时依赖；GitHub Actions Run `38233490072` 已通过 Ubuntu package smoke，
+Run `38233720311` 已通过 Debian 13 `--network none` 安装、首次启动、Bundle/Skill、
+`dsh://` 激活和卸载验收。Run `38336572137` 已通过公开 `.4` 到当前候选 deb 的 Ubuntu
+升级、旧 launcher 清理、旧默认 profile 迁移、显式禁用保留和自定义 profile 保留。
 Python/Keyring、深链回调和真实 SCNet issuer、scope、redirect URI、账户关联 endpoint
 仍待 M0 外部合同确认，因此当前实现不执行网络登录，也不代表 SCNet OAuth2 已完成。
