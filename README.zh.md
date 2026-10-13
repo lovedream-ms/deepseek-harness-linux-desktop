@@ -8,7 +8,7 @@ macOS 版保持一致的非官方补丁集。
 上游只发布 macOS 与 Windows —— 其 `apps/desktop/README.md` 明确写着 Linux 不是受支持的桌面
 发布目标，打包测试也断言 `linux-x64` 目标必须被拒绝。本仓库就是把这层限制打开的那组 diff。
 
-> **状态：Linux x64 已在 GitHub Actions 的 Ubuntu 24.04 LTS 与 Debian 13（trixie）上验证通过，本机亦通过。** 既有 Linux 发布链路已在 Ubuntu 24.04 x86_64 上完成编译、打包与冒烟，deb 安装链路也在 Debian 13 容器里跑通。二十二个补丁可干净应用到上游 tag；SCNet 预置 Bundle 补丁已通过类型检查和针对性 Desktop 测试。Linux 发行包使用 deb。`patches/0009`–`0012` 修复了首次 Linux 验证发现的类型错误、dsh 启动器 payload 路径、上传计划报错信息以及上游门禁拒绝的风格与仓库引用；`patches/0018` 预置 `dsh-scnet@0.6.6`，`patches/0019` 更新到 `0.6.7`，`patches/0020` 更新到 `dsh-scnet@0.6.8` 并配套 connector 会话和错误合同，`patches/0021` 为 Desktop 菜单增加本地只读 SCNet 诊断页，`patches/0022` 声明 Electron 在干净 Debian/Ubuntu 安装中需要的 ALSA 运行时依赖。
+> **状态：Linux x64 已在 GitHub Actions 的 Ubuntu 24.04 LTS 与 Debian 13（trixie）上验证通过，本机亦通过。** 既有 Linux 发布链路已在 Ubuntu 24.04 x86_64 上完成编译、打包与冒烟，deb 安装链路也在 Debian 13 容器里跑通。二十三个补丁可干净应用到上游 tag；SCNet 预置 Bundle 补丁已通过类型检查和针对性 Desktop 测试。Linux 发行包使用 deb。`patches/0009`–`0012` 修复了首次 Linux 验证发现的类型错误、dsh 启动器 payload 路径、上传计划报错信息以及上游门禁拒绝的风格与仓库引用；`patches/0018` 预置 `dsh-scnet@0.6.6`，`patches/0019` 更新到 `0.6.7`，`patches/0020` 更新到 `dsh-scnet@0.6.8` 并配套 connector 会话和错误合同，`patches/0021` 为 Desktop 菜单增加本地只读 SCNet 诊断页，`patches/0022` 声明 Electron 在干净 Debian/Ubuntu 安装中需要的 ALSA 运行时依赖，`patches/0023` 修复补丁自身触发的 Linux 门禁 lint 和翻译配对失败。
 
 基线：上游 tag **`dsh-v0.2.0-rc.2`**（commit `639ed0153972`），22 个补丁。
 
@@ -387,7 +387,7 @@ workflow 的各个 job 及其证明的事：
 ## 10. 目录结构、许可与署名
 
 ```
-patches/0001..0022*.patch   git format-patch 序列，按文件名顺序应用
+patches/0001..0023*.patch   git format-patch 序列，按文件名顺序应用
 apply.sh                    克隆上游基线 tag、应用序列、生成 .env.linux
 verify.sh                   一次性 Linux 诊断脚本（--env-only / --full），产出诊断 tarball
 LINUX-DESKTOP.md            长文指南：逐文件说明、已验证事实、待办项

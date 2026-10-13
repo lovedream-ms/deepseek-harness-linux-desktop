@@ -1,6 +1,6 @@
 # SCNet 开发交接与后续 TODO
 
-- 交接日期：2026-10-12
+- 交接日期：2026-10-13
 - 当前状态：`in progress`
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
@@ -21,12 +21,13 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 22 个补丁在全新上游树重放
+- [x] 23 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
 - [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
 - [ ] Debian 13 候选升级路径验收（后续手动多发行版阶段，非日常阻塞项）
+- [ ] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（当前手动 Run `38343669703`）
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 
@@ -59,8 +60,8 @@
 | `scnet-hpc`（canonical） | `main` / `d4e88cc` | Skill、VERSION、发布文档和同步源；当前版本 `0.6.8` |
 | `dsh-scnet` | `main` / `f41c710` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入；版本 `0.6.8` |
 | `codex-scnet-hpc` | `main` / `5852229` | canonical Skill 同步后的 Codex skills-only Plugin；版本 `0.6.8` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖；默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `b5fff1d` | 补丁 `0018`–`0022` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题；默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `9e34b21` | 补丁 `0018`–`0023` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
 
@@ -123,6 +124,11 @@ git diff --check
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
 - `0022` 的 Desktop 定向打包测试通过，并在生成 deb 的 control 字段中确认包含 `libasound2`。
+- `0023` 的 `pnpm run lint:contracts-ready`、Desktop 相关 4 个测试文件（50 passed，1 skipped）
+  和 `verify-translation-pairing apps/desktop/README.md` 均通过；`0023` 已在基线 tag 上与前 22 个补丁顺序重放成功。
+- Run `38338147889` 暴露的 sandbox 失败不是内核回归：主门禁失败后，Landlock launcher 构建步骤被
+  GitHub Actions 默认跳过，导致 Landlock 测试自跳过。工作流已改为 `if: always()`，当前手动
+  Run `38343669703` 正在重新验证真实 Landlock leg；bwrap/Landlock 自跳过仍会被判失败。
 
 ### 3.3 M1 发行包审计
 

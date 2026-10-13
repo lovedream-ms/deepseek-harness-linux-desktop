@@ -10,7 +10,7 @@ Upstream ships macOS and Windows only — its own `apps/desktop/README.md` state
 `linux-x64` target must be rejected. This repository is the set of diffs that opens that
 path up.
 
-> **Status: Linux x64 verified on Ubuntu 24.04 LTS and Debian 13 (trixie) in GitHub Actions, and locally.** The existing Linux release path has been compiled, packaged, and smoke-tested on Ubuntu 24.04 x86_64; the deb installation chain also runs inside a Debian 13 container. The twenty-two-patch series applies cleanly, and the SCNet bundle patches are typechecked with targeted Desktop tests. Linux releases use the deb package. `patches/0009`–`0012` fix what the first real Linux runs surfaced: a `TS2339` typecheck failure, a `dsh` launcher that could not find its payload, an upload-plan error that dropped the environment name, and four style/repository-reference errors rejected by upstream's Linux gate. `patches/0018` preinstalls `dsh-scnet@0.6.6`; `patches/0019` advances to `0.6.7`; `patches/0020` advances the fixed bundle to `dsh-scnet@0.6.8` with the connector session and error contract; `patches/0021` adds a local, read-only SCNet diagnostics page to the Desktop menu; `patches/0022` declares the ALSA runtime dependency required by Electron on clean Debian/Ubuntu installs.
+> **Status: Linux x64 verified on Ubuntu 24.04 LTS and Debian 13 (trixie) in GitHub Actions, and locally.** The existing Linux release path has been compiled, packaged, and smoke-tested on Ubuntu 24.04 x86_64; the deb installation chain also runs inside a Debian 13 container. The twenty-three-patch series applies cleanly, and the SCNet bundle patches are typechecked with targeted Desktop tests. Linux releases use the deb package. `patches/0009`–`0012` fix what the first real Linux runs surfaced: a `TS2339` typecheck failure, a `dsh` launcher that could not find its payload, an upload-plan error that dropped the environment name, and four style/repository-reference errors rejected by upstream's Linux gate. `patches/0018` preinstalls `dsh-scnet@0.6.6`; `patches/0019` advances to `0.6.7`; `patches/0020` advances the fixed bundle to `dsh-scnet@0.6.8` with the connector session and error contract; `patches/0021` adds a local, read-only SCNet diagnostics page to the Desktop menu; `patches/0022` declares the ALSA runtime dependency required by Electron on clean Debian/Ubuntu installs; `patches/0023` closes the Linux gate's patch-owned lint and translation-pairing failures.
 
 Base: upstream tag **`dsh-v0.2.0-rc.2`** (commit `639ed0153972`), 22 patches.
 
@@ -403,7 +403,7 @@ Not verified in this environment:
 ## 10. Layout, license, attribution
 
 ```
-patches/0001..0022*.patch   git format-patch series, applied in file-name order
+patches/0001..0023*.patch   git format-patch series, applied in file-name order
 apply.sh                    clone upstream at the base tag, apply the series, create .env.linux
 verify.sh                   one-shot Linux diagnostic (--env-only / --full); emits a tarball
 LINUX-DESKTOP.md            long-form guide: per-file notes, verified facts, open items
