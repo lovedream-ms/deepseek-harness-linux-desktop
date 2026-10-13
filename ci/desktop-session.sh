@@ -33,6 +33,14 @@ if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
   printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app"]}}}' \
     >"$DSH_HOME/profiles/desktop/package.json"
   printf '%s\n' '0.6.8' >"$DSH_HOME/profiles/desktop/.dsh-scnet.disabled"
+elif [ "$PROFILE_EXPECTATION" = "legacy-default" ]; then
+  mkdir -p "$DSH_HOME/profiles/desktop"
+  printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app"]}}}' \
+    >"$DSH_HOME/profiles/desktop/package.json"
+elif [ "$PROFILE_EXPECTATION" = "custom" ]; then
+  mkdir -p "$DSH_HOME/profiles/desktop"
+  printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-web-app"]},"customMarker":"preserve-me"}}' \
+    >"$DSH_HOME/profiles/desktop/package.json"
 fi
 # Electron refuses to start as root without --no-sandbox ("Running as root without --no-sandbox is
 # not supported"). Containers commonly run as root; the hosted runners do not.
@@ -154,6 +162,26 @@ if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
   else
     fail "explicit SCNet disable marker or bundle state was changed"
   fi
+elif [ "$PROFILE_EXPECTATION" = "legacy-default" ]; then
+  bundles=$(profile_bundles)
+  if [ -f "$profile" ] && [ -e "$profile" ] \
+    && [[ "$bundles" == *'"dsh-scnet"'* ]] \
+    && [ ! -e "$DSH_HOME/profiles/desktop/.dsh-scnet.disabled" ]; then
+    note "PASS: untouched legacy Desktop profile migrated to dsh-scnet"
+  else
+    fail "untouched legacy Desktop profile was not migrated to dsh-scnet"
+  fi
+elif [ "$PROFILE_EXPECTATION" = "custom" ]; then
+  if ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
+    const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+    const bundles = manifest.dsh?.profile?.bundles ?? []
+    if (bundles.includes("dsh-scnet") || bundles.length !== 1 || bundles[0] !== "@deepseek-ai/dsh-web-app") process.exit(1)
+    if (manifest.dsh?.customMarker !== "preserve-me") process.exit(1)
+  ' "$profile"; then
+    note "PASS: custom Desktop profile was preserved without implicit dsh-scnet insertion"
+  else
+    fail "custom Desktop profile was changed during initialization"
+  fi
 elif [ "$PROFILE_EXPECTATION" = "legacy" ]; then
   note "SKIP: legacy published package has no SCNet bundle contract"
 elif [ -f "$profile" ] && ELECTRON_RUN_AS_NODE=1 "$APP_BIN" --expose-internals -e '
@@ -169,6 +197,8 @@ if [ "$PROFILE_EXPECTATION" = "default" ] && [ -e "$DSH_HOME/profiles/desktop/.d
 else
   if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
     note "PASS: the disabled Desktop profile retains its SCNet disabled marker"
+  elif [ "$PROFILE_EXPECTATION" = "legacy-default" ] || [ "$PROFILE_EXPECTATION" = "custom" ]; then
+    note "PASS: profile migration mode has no SCNet disabled marker"
   elif [ "$PROFILE_EXPECTATION" = "legacy" ]; then
     note "SKIP: legacy published package has no SCNet disabled-marker contract"
   else

@@ -40,6 +40,10 @@ on:
         description: Run Debian 13 and other distribution container acceptance
         type: boolean
         default: false
+      run-candidate-upgrade:
+        description: Upgrade the latest published deb to the current candidate and verify profile migration
+        type: boolean
+        default: false
       release-tag:
         description: Release tag whose published deb the published-artifact jobs verify
         type: string
@@ -48,6 +52,10 @@ on:
         description: Release tag the deb upgrade path upgrades from
         type: string
         default: v0.2.0-rc.2-linux.2
+      candidate-base-tag:
+        description: Published release tag used as the base for current-candidate upgrade checks
+        type: string
+        default: v0.2.0-rc.2-linux.4
   push:
     branches: [main]
     paths:
@@ -74,7 +82,7 @@ jobs:
   typecheck:
     name: install + typecheck + package preflight + Linux package smoke
     runs-on: ubuntu-24.04
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-core || inputs.run-multidistro }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-core || inputs.run-multidistro || inputs.run-candidate-upgrade }}
     timeout-minutes: 60
     steps:
       - name: Environment report
@@ -225,6 +233,81 @@ jobs:
           debs=(deb-artifacts/*.deb)
           test "${#debs[@]}" -eq 1
           bash ci/debian13-offline.sh "${debs[0]}"
+
+  candidate-upgrade:
+    name: current candidate upgrade and profile migration
+    runs-on: ubuntu-24.04
+    needs: typecheck
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run-candidate-upgrade }}
+    timeout-minutes: 60
+    env:
+      CANDIDATE_BASE_TAG: ${{ inputs.candidate-base-tag || 'v0.2.0-rc.2-linux.4' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-deb-build
+          path: candidate-artifacts
+
+      - name: Download the published base package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p base-artifacts
+          gh release download "$CANDIDATE_BASE_TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -D base-artifacts
+          ls -l base-artifacts candidate-artifacts
+
+      - name: Session tooling
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq xvfb xauth openbox xdotool dbus-x11 imagemagick libglib2.0-bin
+
+      - name: Install the published base, then upgrade to the current candidate
+        run: |
+          set -eux
+          shopt -s nullglob
+          base=(base-artifacts/*.deb)
+          candidate=(candidate-artifacts/*.deb)
+          test "${#base[@]}" -eq 1
+          test "${#candidate[@]}" -eq 1
+          sudo apt-get install -y "${base[0]}"
+          dpkg -s deepseek-harness | sed -n '1,5p'
+          sudo ln -sf '/opt/DeepSeek Harness/deepseek-harness' '/usr/bin/DeepSeek Harness'
+          test -L '/usr/bin/DeepSeek Harness'
+          # The current candidate keeps the upstream app version while changing the patched
+          # runtime, so force a local reinstall to execute its maintainer scripts.
+          sudo apt-get install -y --reinstall "${candidate[0]}"
+          test ! -e '/usr/bin/DeepSeek Harness'
+          test -x /usr/bin/deepseek-harness
+          echo "CANDIDATE-UPGRADE: package replacement and legacy launcher cleanup passed"
+
+      - name: Verify default, disabled and custom profile migration
+        env:
+          SKIP_HEADLESS_RELAUNCH_CHECK: '1'
+        run: |
+          set -euo pipefail
+          for mode in legacy-default disabled custom; do
+            home=$(mktemp -d)
+            mkdir -p "candidate-session/$mode"
+            DSH_HOME="$home" \
+              PROFILE_EXPECTATION="$mode" \
+              SHOT_DIR="$GITHUB_WORKSPACE/candidate-session/$mode" \
+              dbus-run-session -- xvfb-run -a -s "-screen 0 1280x900x24" \
+                bash "$GITHUB_WORKSPACE/ci/desktop-session.sh" \
+                2>&1 | tee "candidate-session/$mode/session.log"
+            rm -rf -- "$home"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: candidate-upgrade-logs
+          path: |
+            candidate-session/**/*.log
+            candidate-session/**/*.png
+          if-no-files-found: warn
 
   linux-gates:
     # Product-core coverage the packaging job does not reach: upstream's own Linux gate
