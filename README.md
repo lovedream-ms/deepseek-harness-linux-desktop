@@ -302,8 +302,9 @@ The workflow's jobs and what each one establishes:
 |---|---|---|
 | `install + typecheck + package preflight + Linux package smoke` | patches apply, typecheck and package preflight pass, deb build, installed deb starts and handles close/`dsh://` on Ubuntu 24.04 | push |
 | `Debian 13 and multi-distro package acceptance` | Debian 13 offline install, first launch, profile-state checks and purge; the deb is the exact artifact from the Ubuntu job | manual (`run-multidistro`) |
+| `current candidate upgrade and profile migration` | the latest published deb can be replaced by the current candidate on Ubuntu; legacy launcher cleanup, untouched profile migration, explicit disable preservation and custom-profile preservation pass | manual (`run-candidate-upgrade`) |
 | `upstream Linux gates, sandbox confinement, keyless agent smoke` | upstream's own Linux gate, bwrap/Landlock confinement, and a keyless agent turn | manual |
-| `deb upgrade path and AppArmor-hardened launch` | upgrading `…linux.2` → `…linux.3` cleans the legacy launcher, and the app starts under `kernel.apparmor_restrict_unprivileged_userns=1` **without** `--no-sandbox` | manual |
+| `deb upgrade path and AppArmor-hardened launch` | upgrading two published debs cleans the legacy launcher, and the app starts under `kernel.apparmor_restrict_unprivileged_userns=1` **without** `--no-sandbox` | manual |
 | `Wayland` | the deb boots as a pure Wayland client under a headless compositor | manual |
 
 Removed, and what each cost:

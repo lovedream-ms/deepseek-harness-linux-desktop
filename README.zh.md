@@ -287,8 +287,9 @@ workflow 的各个 job 及其证明的事：
 |---|---|---|
 | `install + typecheck + package preflight + Linux package smoke` | 补丁能应用、类型检查/预检通过、deb 能构建，Ubuntu 24.04 安装后的 deb 可启动并通过关窗/`dsh://` 检查 | push |
 | `Debian 13 and multi-distro package acceptance` | Debian 13 离线安装、首次启动、profile 状态和 purge；使用 Ubuntu job 生成的同一个 deb | 手动（`run-multidistro`） |
+| `current candidate upgrade and profile migration` | Ubuntu 上可从最新公开 deb 替换为当前候选包；旧启动器清理、旧默认 profile 迁移、显式禁用和自定义 profile 保留通过 | 手动（`run-candidate-upgrade`） |
 | `upstream Linux gates, sandbox confinement, keyless agent smoke` | 上游自己的 Linux 门禁、bwrap/Landlock 隔离、以及一次无 key 的 agent 回合 | 手动 |
-| `deb upgrade path and AppArmor-hardened launch` | 从 `…linux.2` 升到 `…linux.3` 会清掉旧启动器；且在 `kernel.apparmor_restrict_unprivileged_userns=1` 下**不加** `--no-sandbox` 也能启动 | 手动 |
+| `deb upgrade path and AppArmor-hardened launch` | 两个已发布 deb 之间升级会清掉旧启动器；且在 `kernel.apparmor_restrict_unprivileged_userns=1` 下**不加** `--no-sandbox` 也能启动 | 手动 |
 | `Wayland` | deb 在 headless 合成器下以纯 Wayland 客户端启动 | 手动 |
 
 已移除的 job，以及各自的代价：
