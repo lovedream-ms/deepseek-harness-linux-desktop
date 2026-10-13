@@ -272,13 +272,13 @@ jobs:
           candidate=(candidate-artifacts/*.deb)
           test "${#base[@]}" -eq 1
           test "${#candidate[@]}" -eq 1
-          sudo apt-get install -y "${base[0]}"
+          sudo apt-get install -y "./${base[0]}"
           dpkg -s deepseek-harness | sed -n '1,5p'
           sudo ln -sf '/opt/DeepSeek Harness/deepseek-harness' '/usr/bin/DeepSeek Harness'
           test -L '/usr/bin/DeepSeek Harness'
           # The current candidate keeps the upstream app version while changing the patched
           # runtime, so force a local reinstall to execute its maintainer scripts.
-          sudo apt-get install -y --reinstall "${candidate[0]}"
+          sudo apt-get install -y --reinstall "./${candidate[0]}"
           test ! -e '/usr/bin/DeepSeek Harness'
           test -x /usr/bin/deepseek-harness
           echo "CANDIDATE-UPGRADE: package replacement and legacy launcher cleanup passed"
