@@ -12,7 +12,7 @@ path up.
 
 > **Status: Linux x64 verified on Ubuntu 24.04 LTS and Debian 13 (trixie) in GitHub Actions, and locally.** The existing Linux release path has been compiled, packaged, and smoke-tested on Ubuntu 24.04 x86_64; the deb installation chain also runs inside a Debian 13 container. The twenty-three-patch series applies cleanly, and the SCNet bundle patches are typechecked with targeted Desktop tests. Linux releases use the deb package. `patches/0009`–`0012` fix what the first real Linux runs surfaced: a `TS2339` typecheck failure, a `dsh` launcher that could not find its payload, an upload-plan error that dropped the environment name, and four style/repository-reference errors rejected by upstream's Linux gate. `patches/0018` preinstalls `dsh-scnet@0.6.6`; `patches/0019` advances to `0.6.7`; `patches/0020` advances the fixed bundle to `dsh-scnet@0.6.8` with the connector session and error contract; `patches/0021` adds a local, read-only SCNet diagnostics page to the Desktop menu; `patches/0022` declares the ALSA runtime dependency required by Electron on clean Debian/Ubuntu installs; `patches/0023` closes the Linux gate's patch-owned lint and translation-pairing failures.
 
-Base: upstream tag **`dsh-v0.2.0-rc.2`** (commit `639ed0153972`), 22 patches.
+Base: upstream tag **`dsh-v0.2.0-rc.2`** (commit `639ed0153972`), 23 patches.
 
 ---
 
@@ -136,7 +136,7 @@ sh "$PATCH_REPO/apply.sh" "$SRC"
 ```
 
 `apply.sh` clones upstream at tag `dsh-v0.2.0-rc.2`, creates branch `linux-desktop`, runs
-`git am` on all 22 patches, and copies `.env.linux.example` to `.env.linux` (the packaging
+`git am` on all 23 patches, and copies `.env.linux.example` to `.env.linux` (the packaging
 code requires that file and aborts without it).
 
 Success conditions — all four must hold:
@@ -317,11 +317,11 @@ Removed, and what each cost:
 
 Verified:
 
-- All 22 patches apply cleanly on `dsh-v0.2.0-rc.2`; after `git am` the worktree is clean with
+- All 23 patches apply cleanly on `dsh-v0.2.0-rc.2`; after `git am` the worktree is clean with
   no leftover changes. (The tree hash moves with the series, so read it with
   `git -C <src> rev-parse HEAD^{tree}` rather than comparing against a value quoted here.)
 - `apply.sh` runs end to end, including under a C locale with no git identity configured:
-  fresh shallow clone → 22 patches → `.env.linux` created → exit 0.
+  fresh shallow clone → 23 patches → `.env.linux` created → exit 0.
 - `check:package` passes and the official Linux build passes runtime preparation, Office
   document round-trip, and Electron packaging.
 - The packaged application starts and serves its local `dsh web` endpoint, with no
