@@ -13,8 +13,9 @@
 当前仓库：
 - 路径：/home/kylinlu/Downloads/agent/plugins/deepseek-harness-linux-desktop
 - 分支：main
-- 当前提交：dd9e9d0
-- origin/main 已同步，开始工作前先执行 `git status --short --branch`。
+- 最新已提交：8156729 (`docs: add copy-ready handoff prompt`)
+- `origin/main` 仍停在 `dd9e9d0`；本轮 release-gate 证据更新尚未提交，开始工作前先执行
+  `git status --short --branch`，不要假设工作树干净。
 
 项目边界：
 - 当前目标是 Linux x64 Desktop deb 发布线和离线 SCNet Bundle 能力。
@@ -57,7 +58,9 @@ CI 状态：
 - Push 基础验证 Run `38343523693`：success。
   已覆盖补丁应用、依赖安装、类型检查、Desktop 构建、package preflight、deb 构建和安装验证。
 - 手动完整门禁 Run `38343669703`：failure。
-  该 run 的精确失败步骤必须先重新读取；此前 GitHub API 曾短暂返回 EOF，不要凭猜测修改代码。
+  已确认 `Build the Landlock launcher`、`Sandbox confinement e2e` 和 `Keyless agent smoke` 通过；
+  唯一失败 job 是 `upstream Linux gates`。该 job 的精确失败任务仍必须从 `linux-gates.log` 归因；
+  在此之前不要凭猜测修改 coverage 容忍、lint 或 release workflow。
 - 先执行：
   `gh run view 38343669703 --repo lql341/deepseek-harness-linux-desktop --json jobs`
   `gh run view 38343669703 --repo lql341/deepseek-harness-linux-desktop --log-failed`
@@ -65,9 +68,10 @@ CI 状态：
   1. `lint:contracts-ready` 是否仍失败；
   2. `translation pairing` 是否通过；
   3. `test:coverage` 是否仍命中上游 welcome-startup 竞态；
-  4. Landlock launcher 构建是否真正执行；
-  5. Landlock 两个测试文件是否实际运行，而不是全部 self-skip；
-  6. keyless agent smoke 是否通过。
+  4. Landlock launcher 构建是否真正执行（已通过）；
+  5. Landlock 两个测试文件是否实际运行，而不是全部 self-skip（已通过）；
+  6. keyless agent smoke 是否通过（已通过）；
+  7. 下载的 `linux-gates.log` 中 upstream primary gate 的具体失败任务。
 
 已知历史问题：
 - Run `38338147889` 中的 7 个 lint 错误已由 `0023` 修复。

@@ -27,7 +27,7 @@
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
 - [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
 - [ ] Debian 13 候选升级路径验收（后续手动多发行版阶段，非日常阻塞项）
-- [ ] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（当前手动 Run `38343669703`）
+- [ ] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（Run `38343669703` 仍失败；已确认 sandbox confinement、Landlock launcher 和 keyless agent smoke 通过，唯一失败 job 为 upstream Linux primary gate，待读取 `linux-gates.log` 后归因）
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 
@@ -127,8 +127,10 @@ git diff --check
 - `0023` 的 `pnpm run lint:contracts-ready`、Desktop 相关 4 个测试文件（50 passed，1 skipped）
   和 `verify-translation-pairing apps/desktop/README.md` 均通过；`0023` 已在基线 tag 上与前 22 个补丁顺序重放成功。
 - Run `38338147889` 暴露的 sandbox 失败不是内核回归：主门禁失败后，Landlock launcher 构建步骤被
-  GitHub Actions 默认跳过，导致 Landlock 测试自跳过。工作流已改为 `if: always()`，当前手动
-  Run `38343669703` 正在重新验证真实 Landlock leg；bwrap/Landlock 自跳过仍会被判失败。
+  GitHub Actions 默认跳过，导致 Landlock 测试自跳过。工作流已改为 `if: always()`；Run
+  `38343669703` 已确认 launcher 构建成功，bwrap/Landlock 两个测试文件均实际运行并通过，
+  keyless agent smoke 也通过。该 run 仍因 upstream Linux primary gate 失败而未形成 release-preflight
+  证据；在取得 `linux-gates.log` 的具体失败任务前，不得修改 coverage 容忍或创建 `.5` release。
 
 ### 3.3 M1 发行包审计
 
