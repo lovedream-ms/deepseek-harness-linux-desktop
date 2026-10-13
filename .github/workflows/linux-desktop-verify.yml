@@ -56,6 +56,13 @@ on:
         description: Published release tag used as the base for current-candidate upgrade checks
         type: string
         default: v0.2.0-rc.2-linux.4
+      released-profile-expectation:
+        description: >-
+          Profile bundle state the published deb verified by the release-verify job is expected to
+          ship: "default" for a release built from the current series, "legacy" for a tag that
+          predates the SCNet bundle contract.
+        type: string
+        default: default
   push:
     branches: [main]
     paths:
@@ -520,6 +527,10 @@ jobs:
         env:
           SKIP_HEADLESS_RELAUNCH_CHECK: '1'
           SHOT_DIR: ${{ github.workspace }}/session
+          # Older published tags (through v0.2.0-rc.2-linux.4) predate the SCNet default-activation
+          # contract, so verifying them must not assert the current bundle expectation. The default
+          # stays strict; a release built from this series is verified with the default behavior.
+          PROFILE_EXPECTATION: ${{ inputs.released-profile-expectation || 'default' }}
         run: |
           set -o pipefail
           mkdir -p "$SHOT_DIR"
