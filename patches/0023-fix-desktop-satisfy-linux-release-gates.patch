@@ -1,0 +1,149 @@
+From 23e496a4029be2842976da80701fadbbba9031f1 Mon Sep 17 00:00:00 2001
+From: Codex <codex@localhost>
+Date: Tue, 13 Oct 2026 11:46:28 +0800
+Subject: [PATCH] fix(desktop): satisfy Linux release gate lint and translation
+ pairing
+
+---
+ apps/desktop/README.i18n.yaml                       |  4 ++--
+ apps/desktop/electron-builder.config.d.mts          |  7 +++++--
+ apps/desktop/src/scnet-diagnostics-window.ts        |  2 +-
+ apps/desktop/src/scnet-diagnostics.ts               | 11 +++++++++--
+ apps/desktop/tests/installer-packaging.spec.ts      |  2 +-
+ apps/desktop/tests/project-manager.spec.ts          | 10 ++++++----
+ apps/desktop/tests/scnet-diagnostics-window.spec.ts |  3 ++-
+ 7 files changed, 26 insertions(+), 13 deletions(-)
+
+diff --git a/apps/desktop/README.i18n.yaml b/apps/desktop/README.i18n.yaml
+index f412464..c241793 100644
+--- a/apps/desktop/README.i18n.yaml
++++ b/apps/desktop/README.i18n.yaml
+@@ -3,8 +3,8 @@
+ # After editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write apps/desktop/README.md
+ /deepseek-harness-desktop:
+-  en: eccac345d51428fa
+-  zh: 4a448b3d63cb8117
++  en: 5a39a616a8761f36
++  zh: 605b616253986ca8
+ /deepseek-harness-desktop/terminal-command:
+   en: bef92953c237363f
+   zh: d21d6effd21b8c00
+diff --git a/apps/desktop/electron-builder.config.d.mts b/apps/desktop/electron-builder.config.d.mts
+index b97f74a..1bac13d 100644
+--- a/apps/desktop/electron-builder.config.d.mts
++++ b/apps/desktop/electron-builder.config.d.mts
+@@ -21,8 +21,10 @@ export interface DesktopElectronBuilderConfig {
+   readonly extraResources: readonly [
+     { readonly from: string, readonly to: 'runtime' },
+     { readonly from: string, readonly to: 'icon.png' },
+-    ...{ readonly from: string, readonly to: 'tray.ico' }[],
+-    ...{ readonly from: string, readonly to: 'tray.png' }[],
++    ...(
++      | { readonly from: string, readonly to: 'tray.ico' }
++      | { readonly from: string, readonly to: 'tray.png' }
++    )[],
+   ]
+   readonly mac: {
+     readonly extendInfo: { readonly NSMicrophoneUsageDescription: string }
+@@ -54,6 +56,7 @@ export interface DesktopElectronBuilderConfig {
+   }
+   readonly deb: {
+     readonly afterInstall: string
++    readonly depends: readonly string[]
+   }
+   readonly nsis: {
+     readonly include: string
+diff --git a/apps/desktop/src/scnet-diagnostics-window.ts b/apps/desktop/src/scnet-diagnostics-window.ts
+index a24d69c..0c7b7ed 100644
+--- a/apps/desktop/src/scnet-diagnostics-window.ts
++++ b/apps/desktop/src/scnet-diagnostics-window.ts
+@@ -94,6 +94,6 @@ export async function openScnetDiagnosticsWindow(locale: DesktopLocale, operatio
+     if (!window.isDestroyed()) window.destroy()
+     throw error
+   }
+-  if (active && !window.isDestroyed()) window.show()
++  if (!window.isDestroyed()) window.show()
+   return window
+ }
+diff --git a/apps/desktop/src/scnet-diagnostics.ts b/apps/desktop/src/scnet-diagnostics.ts
+index 803af09..b1378f0 100644
+--- a/apps/desktop/src/scnet-diagnostics.ts
++++ b/apps/desktop/src/scnet-diagnostics.ts
+@@ -72,16 +72,23 @@ function configRoot(environment: NodeJS.ProcessEnv): string {
+   return join(configured === undefined || configured === '' ? join(homedir(), '.config') : configured, 'scnet-hpc')
+ }
+ 
++function stringValue(value: unknown): string | undefined {
++  return typeof value === 'string' ? value : undefined
++}
++
+ function readConfig(environment: NodeJS.ProcessEnv, commandExists: (command: string) => boolean): ScnetConfig {
+   const root = configRoot(environment)
+   let data: { DEFAULT_BACKEND?: unknown; openapi?: Record<string, unknown>; backend?: unknown } = {}
+   try {
+-    const rootConfig = JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) as typeof data
++    const rootConfig: unknown = JSON.parse(readFileSync(join(root, 'config.json'), 'utf8'))
+     if (rootConfig !== null && typeof rootConfig === 'object') data = rootConfig
+   } catch {
+     // Missing or malformed local configuration is represented as "needs setup".
+   }
+-  const backend = String(environment.SCNET_HPC_BACKEND ?? data.DEFAULT_BACKEND ?? data.backend ?? 'openapi').trim().toLowerCase()
++  const backend = (stringValue(environment.SCNET_HPC_BACKEND)
++    ?? stringValue(data.DEFAULT_BACKEND)
++    ?? stringValue(data.backend)
++    ?? 'openapi').trim().toLowerCase()
+   const hasEnvironmentCredentials = Boolean(
+     environment.SCNET_OPENAPI_TOKEN?.trim()
+     || (
+diff --git a/apps/desktop/tests/installer-packaging.spec.ts b/apps/desktop/tests/installer-packaging.spec.ts
+index 42ba38e..a28e0a7 100644
+--- a/apps/desktop/tests/installer-packaging.spec.ts
++++ b/apps/desktop/tests/installer-packaging.spec.ts
+@@ -90,7 +90,7 @@ describe('installer preparation preserves application dependencies', () => {
+     }, 'linux', 'x64')
+     expect(config.linux.executableName).toBe('deepseek-harness')
+     expect(config.deb.afterInstall).toMatch(/linux-after-install\.tpl$/u)
+-    expect(config.deb).toEqual(expect.objectContaining({ depends: expect.arrayContaining(['libasound2']) }))
++    expect(config.deb.depends).toContain('libasound2')
+     expect(readFileSync(config.deb.afterInstall, 'utf8')).toContain('/usr/bin/DeepSeek Harness')
+   })
+ 
+diff --git a/apps/desktop/tests/project-manager.spec.ts b/apps/desktop/tests/project-manager.spec.ts
+index 133fd79..a444049 100644
+--- a/apps/desktop/tests/project-manager.spec.ts
++++ b/apps/desktop/tests/project-manager.spec.ts
+@@ -192,10 +192,12 @@ describe('desktop external plugin profile', () => {
+     await expect(manager.applyRelease()).resolves.toBeUndefined()
+     await expect(manager.applyRelease()).resolves.toBeUndefined()
+     expect(plugins(manager)).toEqual([])
+-    expect(JSON.parse(readFileSync(join(manager.paths.profile, 'package.json'), 'utf8'))).toMatchObject({
+-      dependencies: {},
+-      dsh: { profile: { bundles: expect.arrayContaining([SCNET_BUNDLE_PACKAGE]) } },
+-    })
++    const manifest = JSON.parse(readFileSync(join(manager.paths.profile, 'package.json'), 'utf8')) as {
++      dependencies?: Record<string, unknown>
++      dsh?: { profile?: { bundles?: unknown } }
++    }
++    expect(manifest.dependencies).toEqual({})
++    expect(manifest.dsh?.profile?.bundles).toContain(SCNET_BUNDLE_PACKAGE)
+   })
+ 
+   it('adds SCNet to an untouched legacy profile and preserves an explicit disable across releases', async () => {
+diff --git a/apps/desktop/tests/scnet-diagnostics-window.spec.ts b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+index 5171507..fc723c0 100644
+--- a/apps/desktop/tests/scnet-diagnostics-window.spec.ts
++++ b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+@@ -59,7 +59,8 @@ it('accepts status reads only from its own top frame and cleans up on close', as
+       authentication: { state: 'needs-setup', detail: 'not configured' },
+     }),
+   })
+-  expect(window.loadURL).toHaveBeenCalledWith('dsh-app://shell/scnet-diagnostics.html')
++  const loadURL = Reflect.get(window, 'loadURL') as ReturnType<typeof vi.fn>
++  expect(loadURL).toHaveBeenCalledWith('dsh-app://shell/scnet-diagnostics.html')
+   const own = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+   const read = fixture.handlers.get(DESKTOP_IPC.scnetDiagnostics)!
+   expect(() => read({ ...own, senderFrame: {} })).toThrow('unowned')
+-- 
+2.43.0
+

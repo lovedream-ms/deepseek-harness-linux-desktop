@@ -405,6 +405,7 @@ jobs:
           exit "$gate_status"
 
       - name: Build the Landlock launcher for this architecture
+        if: always()
         continue-on-error: true
         working-directory: ${{ env.UPSTREAM_DIR }}
         run: |
