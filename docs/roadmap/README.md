@@ -11,6 +11,7 @@ operational users are currently Chinese-speaking.
 |---|---|---|
 | [`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md) | A-G staged delivery plan, feasibility assessment, milestones, risks, and acceptance gates | Update when scope, dependencies, or release gates change |
 | [`SCNET-DEVELOPMENT-HANDOFF.zh-CN.md`](SCNET-DEVELOPMENT-HANDOFF.zh-CN.md) | Current implementation evidence, repository/commit mapping, delivery boundaries, and prioritized handoff TODOs | Update at each cross-repository handoff or milestone close |
+| [`SCNET-HANDOFF-PROMPT.zh-CN.md`](SCNET-HANDOFF-PROMPT.zh-CN.md) | Copy-ready prompt for handing the current repository to the next coding model | Refresh when the active release gate, branch, or repository workflow changes |
 | [`ADR-0001-plugin-and-connector-architecture.zh-CN.md`](ADR-0001-plugin-and-connector-architecture.zh-CN.md) | Decision record separating the desktop/server plugin from mobile/native connectors | Append a new ADR instead of rewriting the decision after implementation starts |
 
 ## Status vocabulary
