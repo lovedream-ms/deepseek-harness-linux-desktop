@@ -48,6 +48,10 @@ on:
         description: Release tag whose published deb the published-artifact jobs verify
         type: string
         default: v0.2.0-rc.2-linux.3
+      release-id:
+        description: Optional GitHub release ID used to verify draft assets that are not addressable by tag
+        type: string
+        default: ''
       previous-release-tag:
         description: Release tag the deb upgrade path upgrades from
         type: string
@@ -83,6 +87,7 @@ env:
   # Release tags the published-artifact jobs verify. They point at published bytes, not at this
   # tree, and only the manual legs use them, so they follow the input defaults above.
   RELEASE_TAG: ${{ inputs.release-tag || 'v0.2.0-rc.2-linux.3' }}
+  RELEASE_ID: ${{ inputs.release-id || '' }}
   PREVIOUS_RELEASE_TAG: ${{ inputs.previous-release-tag || 'v0.2.0-rc.2-linux.2' }}
 
 jobs:
@@ -508,8 +513,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release
-          gh release download "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
-            -p '*.deb' -p 'SHA256SUMS' -D release
+          bash ci/download-release-assets.sh \
+            "$RELEASE_TAG" "$RELEASE_ID" release '*.deb' 'SHA256SUMS'
           ls -l release
 
       - name: Verify the published checksums
@@ -573,8 +578,10 @@ jobs:
         run: |
           set -eux
           mkdir -p rel-old rel-new
-          gh release download "$PREVIOUS_RELEASE_TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -D rel-old
-          gh release download "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -D rel-new
+          bash ci/download-release-assets.sh \
+            "$PREVIOUS_RELEASE_TAG" "" rel-old '*.deb'
+          bash ci/download-release-assets.sh \
+            "$RELEASE_TAG" "$RELEASE_ID" rel-new '*.deb'
           ls -l rel-old rel-new
 
       - name: Session tooling
@@ -610,7 +617,7 @@ jobs:
       - name: Launch the installed application on the hardened kernel
         env:
           SHOT_DIR: ${{ github.workspace }}/hardened
-          PROFILE_EXPECTATION: legacy
+          PROFILE_EXPECTATION: ${{ inputs.released-profile-expectation || 'default' }}
           SKIP_HEADLESS_RELAUNCH_CHECK: '1'
         run: |
           set -o pipefail
@@ -646,7 +653,8 @@ jobs:
         run: |
           set -eux
           mkdir -p rel
-          gh release download "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -D rel
+          bash ci/download-release-assets.sh \
+            "$RELEASE_TAG" "$RELEASE_ID" rel '*.deb'
           ls -l rel
 
       - name: Install a headless compositor and the deb
