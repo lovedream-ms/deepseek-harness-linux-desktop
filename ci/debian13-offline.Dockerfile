@@ -13,6 +13,7 @@ RUN apt-get update \
     /tmp/deepseek-harness.deb \
     dbus-x11 \
     imagemagick \
+    libasound2t64 \
     libglib2.0-bin \
     openbox \
     procps \
