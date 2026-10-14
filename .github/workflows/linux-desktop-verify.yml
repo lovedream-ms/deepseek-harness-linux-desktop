@@ -231,6 +231,8 @@ jobs:
     needs: typecheck
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run-multidistro }}
     timeout-minutes: 30
+    env:
+      CANDIDATE_BASE_TAG: ${{ inputs.candidate-base-tag || 'v0.2.0-rc.2-linux.4' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -239,13 +241,24 @@ jobs:
           name: linux-deb-build
           path: deb-artifacts
 
-      - name: Debian 13 offline install, first launch, profile state and uninstall
+      - name: Download the published upgrade base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p base-artifacts
+          gh release download "$CANDIDATE_BASE_TAG" -R "$GITHUB_REPOSITORY" \
+            -p '*.deb' -D base-artifacts
+          ls -lh base-artifacts
+
+      - name: Debian 13 offline install, upgrade, profile state and uninstall
         run: |
           set -euo pipefail
           shopt -s nullglob
           debs=(deb-artifacts/*.deb)
+          bases=(base-artifacts/*.deb)
           test "${#debs[@]}" -eq 1
-          bash ci/debian13-offline.sh "${debs[0]}"
+          test "${#bases[@]}" -eq 1
+          bash ci/debian13-offline.sh "${debs[0]}" "${bases[0]}"
 
   candidate-upgrade:
     name: current candidate upgrade and profile migration

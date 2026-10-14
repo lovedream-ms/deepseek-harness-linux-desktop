@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Container-side Debian 13 acceptance checks. The driver runs both modes with
-# Docker networking disabled so startup and removal cannot reach package registries.
+# Container-side Debian 13 acceptance checks. The driver runs install, upgrade
+# and removal modes with Docker networking disabled.
 
 set -euo pipefail
 
@@ -66,11 +66,32 @@ uninstall_check() {
   echo "PASS: Debian 13 purge removed the launcher and application directory"
 }
 
+upgrade_check() {
+  assert_debian_13
+  assert_offline
+  test -f /tmp/deepseek-harness-candidate.deb
+  ln -sf "$APP_BIN" '/usr/bin/DeepSeek Harness'
+  test -L '/usr/bin/DeepSeek Harness'
+  dpkg -i /tmp/deepseek-harness-candidate.deb
+  test ! -e '/usr/bin/DeepSeek Harness'
+  dpkg-query -W -f='${Status} ${Version}\n' deepseek-harness | grep -q '^install ok installed '
+  test -x "$APP_BIN"
+  echo "PASS: Debian 13 candidate upgrade replaced the package and removed the legacy launcher"
+
+  export DSH_HOME="/tmp/dsh-upgrade-${PROFILE_EXPECTATION:-default}"
+  export SHOT_DIR="/tmp/dsh-upgrade-session-${PROFILE_EXPECTATION:-default}"
+  mkdir -p "$DSH_HOME" "$SHOT_DIR"
+  timeout 180 dbus-run-session -- xvfb-run -a -s '-screen 0 1280x900x24' \
+    /usr/local/bin/desktop-session.sh
+  echo "PASS: Debian 13 candidate upgrade preserved the ${PROFILE_EXPECTATION:-default} profile contract"
+}
+
 case "$MODE" in
   session) session_check ;;
   uninstall) uninstall_check ;;
+  upgrade) upgrade_check ;;
   *)
-    echo "usage: $0 session|uninstall" >&2
+    echo "usage: $0 session|uninstall|upgrade" >&2
     exit 2
     ;;
 esac

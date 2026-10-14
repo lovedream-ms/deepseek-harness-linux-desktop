@@ -1,8 +1,10 @@
 FROM debian:trixie-slim
 
 ARG DEB_FILE
+ARG CANDIDATE_FILE
 
 COPY ${DEB_FILE} /tmp/deepseek-harness.deb
+COPY ${CANDIDATE_FILE} /tmp/deepseek-harness-candidate.deb
 COPY desktop-session.sh /usr/local/bin/desktop-session.sh
 COPY debian13-package-check.sh /usr/local/bin/debian13-package-check.sh
 
