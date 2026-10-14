@@ -48,8 +48,8 @@ on:
         description: Release tag whose published deb the published-artifact jobs verify
         type: string
         default: v0.2.0-rc.2-linux.3
-      release-id:
-        description: Optional GitHub release ID used to verify draft assets that are not addressable by tag
+      release-run-id:
+        description: Optional successful publish workflow Run ID whose draft-release-assets artifact is verified
         type: string
         default: ''
       previous-release-tag:
@@ -78,6 +78,7 @@ on:
       - '.github/workflows/publish-linux-desktop.yml'
 
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -87,7 +88,7 @@ env:
   # Release tags the published-artifact jobs verify. They point at published bytes, not at this
   # tree, and only the manual legs use them, so they follow the input defaults above.
   RELEASE_TAG: ${{ inputs.release-tag || 'v0.2.0-rc.2-linux.3' }}
-  RELEASE_ID: ${{ inputs.release-id || '' }}
+  RELEASE_RUN_ID: ${{ inputs.release-run-id || '' }}
   PREVIOUS_RELEASE_TAG: ${{ inputs.previous-release-tag || 'v0.2.0-rc.2-linux.2' }}
 
 jobs:
@@ -514,7 +515,7 @@ jobs:
         run: |
           mkdir -p release
           bash ci/download-release-assets.sh \
-            "$RELEASE_TAG" "$RELEASE_ID" release '*.deb' 'SHA256SUMS'
+            "$RELEASE_TAG" "" "$RELEASE_RUN_ID" release '*.deb' 'SHA256SUMS'
           ls -l release
 
       - name: Verify the published checksums
@@ -579,9 +580,9 @@ jobs:
           set -eux
           mkdir -p rel-old rel-new
           bash ci/download-release-assets.sh \
-            "$PREVIOUS_RELEASE_TAG" "" rel-old '*.deb'
+            "$PREVIOUS_RELEASE_TAG" "" "" rel-old '*.deb'
           bash ci/download-release-assets.sh \
-            "$RELEASE_TAG" "$RELEASE_ID" rel-new '*.deb'
+            "$RELEASE_TAG" "" "$RELEASE_RUN_ID" rel-new '*.deb'
           ls -l rel-old rel-new
 
       - name: Session tooling
@@ -654,7 +655,7 @@ jobs:
           set -eux
           mkdir -p rel
           bash ci/download-release-assets.sh \
-            "$RELEASE_TAG" "$RELEASE_ID" rel '*.deb'
+            "$RELEASE_TAG" "" "$RELEASE_RUN_ID" rel '*.deb'
           ls -l rel
 
       - name: Install a headless compositor and the deb

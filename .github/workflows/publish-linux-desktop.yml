@@ -19,6 +19,10 @@ on:
         description: Create the release as a draft, so it can be reviewed before it is public
         type: boolean
         default: true
+      export-draft-id:
+        description: Existing draft release ID to export for read-only verification instead of publishing
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -33,6 +37,7 @@ jobs:
   publish:
     name: build, checksum, re-verify and publish
     runs-on: ubuntu-24.04
+    if: ${{ inputs.export-draft-id == '' }}
     timeout-minutes: 300
     steps:
       - name: Free disk space
@@ -228,3 +233,34 @@ jobs:
             upstream/publish/SHA256SUMS
             scnet-release-audit.json
           if-no-files-found: warn
+
+  export-draft:
+    name: export existing draft assets for verification
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.export-draft-id != '' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify the existing draft assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash ci/download-release-assets.sh \
+            "$RELEASE_TAG" "${{ inputs.export-draft-id }}" "" draft-release \
+            '*.deb' 'SHA256SUMS'
+          (
+            cd draft-release
+            sha256sum -c SHA256SUMS
+          )
+          ls -lh draft-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: draft-release-assets
+          path: |
+            draft-release/*.deb
+            draft-release/SHA256SUMS
+          if-no-files-found: error
+          compression-level: 0
