@@ -385,6 +385,7 @@ jobs:
           DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: |
           set -o pipefail
+          set +e
           pnpm run check:ci:linux-primary 2>&1 | tee linux-gates.log
           gate_status=${PIPESTATUS[0]}
           # Default to a pass; only downgrade when the gate actually failed and the failure is
