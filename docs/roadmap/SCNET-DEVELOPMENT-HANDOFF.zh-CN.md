@@ -16,13 +16,16 @@
 
 ### M1：Desktop 预制 Bundle 与离线能力
 
-- [x] 固定 `dsh-scnet@0.6.8` 并纳入 Desktop package set
+- [x] 固定 `dsh-scnet@0.6.9` 并纳入 Desktop package set
 - [x] 新安装 profile 默认激活 Bundle
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 23 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败
+- [x] 24 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
+  `0024` 更新到已发布的 `dsh-scnet@0.6.9`
 - [x] Desktop 定向测试 `170/170` 和 host build
+- [x] `0024` 本地新增版本断言测试 `26/26` 通过；`dsh-scnet@0.6.9` npm 包为 54 个文件、MIT
+  许可证，未引入凭证或 endpoint
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
 - [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
@@ -58,11 +61,11 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `scnet-hpc`（canonical） | `main` / `d4e88cc` | Skill、VERSION、发布文档和同步源；当前版本 `0.6.8` |
-| `dsh-scnet` | `main` / `f41c710` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入；版本 `0.6.8` |
-| `codex-scnet-hpc` | `main` / `5852229` | canonical Skill 同步后的 Codex skills-only Plugin；版本 `0.6.8` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题；默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `9e34b21` | 补丁 `0018`–`0023` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `scnet-hpc`（canonical） | `main` / `3b5d0a8` | Skill、VERSION、发布文档和同步源；当前版本 `0.6.9` |
+| `dsh-scnet` | `main` / `d9e41ca` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、凭据存储适配器和受控 Python 解释器路径注入；版本 `0.6.9` |
+| `codex-scnet-hpc` | `main` / 待实时查询 | canonical Skill 同步后的 Codex skills-only Plugin；版本 `0.6.9` |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到已发布的 `0.6.9`；默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `6f66c83` | 补丁 `0018`–`0024` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
 
@@ -81,8 +84,8 @@
 
 ### 2.2 Linux Desktop 补丁 `0018` + `0019`
 
-- 构建时使用固定版本 `dsh-scnet@0.6.8`，记录包版本、完整性和许可证；`0018` 保留为
-  0.6.6 的历史预置，`0019` 更新到 0.6.7，`0020` 完成当前版本切换。
+- 构建时使用固定版本 `dsh-scnet@0.6.9`，记录包版本、完整性和许可证；`0018` 保留为
+  0.6.6 的历史预置，`0019` 更新到 0.6.7，`0020` 完成 0.6.8 切换，`0024` 完成 0.6.9 切换。
 - 将固定包纳入 Desktop 本地 package set，首次启动不运行 pnpm，也不依赖 npm 网络。
 - 新安装的默认 Desktop profile 自动启用 `dsh-scnet`。
 - 旧默认 profile 自动迁移；用户显式禁用后写入 `.dsh-scnet.disabled`，后续升级不重新启用。
@@ -139,7 +142,7 @@ git diff --check
 workflow 和新版本发布前 re-verification。脚本不下载 ASAR 工具，而是使用产物自带
 Electron 的 Node 模式读取同一份 `app.asar`，验证：
 
-- package-set 中 `dsh-scnet@0.6.8` 的 SHA-512、字节数和 MIT 许可证；
+- package-set 中固定 `dsh-scnet@0.6.9` 的 SHA-512、字节数和 MIT 许可证；
 - archived runtime、runtime descriptor、Bundle、`scnet-hpc` Skill 和 `VERSION` 一致；
 - Bundle 的 54 个文件逐个匹配 runtime descriptor 的 SHA-256 和字节数；
 - 不存在带值的 token、AK/SK、`appId`/`appSecret`、私钥、JWT、私网 endpoint；
@@ -151,8 +154,8 @@ Electron 的 Node 模式读取同一份 `app.asar`，验证：
 - deb：`deepseek-harness-0.2.0-rc.2-linux-amd64.deb`，SHA-256
   `3723dbe924a3f3ffb841e26505f950f4849bc2514a7fabf53d4989f8d4280cd6`；
 - `app.asar` SHA-256：`93b05653868135d06213834bf60068290d9390d40854bafeda3c4c2f6cd99f0f`；
-- `dsh-scnet-0.6.8.tgz` SHA-512：
-  `sha512-kMGiJ9whtNpE5uJ0DblcKGAnYZxjucMnN4GWEArxDdz2C+Ug5i12PbvdRyPC/MvHQkheK91AzxsJCGJm1bH+4Q==`；
+- `dsh-scnet-0.6.9.tgz` SHA-512：
+  `sha512-3WHl5leZEf/iQ0AZ7CMOwj1W7JKFs/vY2cbEw1vv+2oPPMeUvHf5ZB42pda9vVhU5BS6CBvmV8ooEjvzrmP0NA==`；
 - unpacked app 与 deb 审计均通过；正例扫描 54 个文本文件，0 个敏感发现；
 - 反例 fixture 对 `.pyc` 缓存和带值 `access_token` 均按预期失败；
 - Desktop 定向测试 3 个文件通过，`42 passed / 1 skipped`；

@@ -139,7 +139,7 @@ else
   step "L2 SCNet release audit"
   PACKAGE_SET="$UPSTREAM_DIR/apps/desktop/.desktop-build/targets/linux-x64/package-set"
   if run "31-scnet-release-audit" node "$REPO_ROOT/ci/scnet-release-audit.mjs" \
-    --app "$APP" --package-set "$PACKAGE_SET" --expected-version 0.6.8 \
+    --app "$APP" --package-set "$PACKAGE_SET" --expected-version 0.6.9 \
     --output "$LOGROOT/scnet-release-audit.json"; then
     cat "$LOGROOT/31-scnet-release-audit.log" | tee -a "$LOGROOT/summary.txt"
   fi

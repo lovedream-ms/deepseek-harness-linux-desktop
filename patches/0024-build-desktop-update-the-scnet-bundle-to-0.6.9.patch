@@ -1,0 +1,79 @@
+From c276a77cca1d07dd511529990990a530e0b73ddd Mon Sep 17 00:00:00 2001
+From: QILIN LU <luqilinheu@gmail.com>
+Date: Thu, 15 Oct 2026 09:22:52 +0800
+Subject: [PATCH] build(desktop): update the SCNet bundle contract
+
+
+diff --git a/apps/desktop/src/scnet-bundle.ts b/apps/desktop/src/scnet-bundle.ts
+index febeb59..02565bd 100644
+--- a/apps/desktop/src/scnet-bundle.ts
++++ b/apps/desktop/src/scnet-bundle.ts
+@@ -4,7 +4,7 @@
+ export const SCNET_BUNDLE_PACKAGE = 'dsh-scnet'
+ 
+ /** Exact published bundle version embedded in this Desktop release. */
+-export const SCNET_BUNDLE_VERSION = '0.6.8'
++export const SCNET_BUNDLE_VERSION = '0.6.9'
+ 
+ /** Package spec fetched only while assembling a Desktop release. */
+ export const SCNET_BUNDLE_SPEC = `${SCNET_BUNDLE_PACKAGE}@${SCNET_BUNDLE_VERSION}`
+diff --git a/apps/desktop/tests/package-target-stages.spec.ts b/apps/desktop/tests/package-target-stages.spec.ts
+index 3b185b1..2495792 100644
+--- a/apps/desktop/tests/package-target-stages.spec.ts
++++ b/apps/desktop/tests/package-target-stages.spec.ts
+@@ -141,7 +141,7 @@ it.each([undefined, '2'])('passes macOS pack concurrency %s only to workspace pa
+   const packs = calls.filter(call => call[0].startsWith('run release:pack'))
+   expect(packs).toHaveLength(2)
+   expect(calls.map(call => call[0])).toContainEqual(expect.stringMatching(
+-    /^dlx npm@12 pack dsh-scnet@0\.6\.8 --pack-destination .*packed[/\\]scnet$/u,
++    /^dlx npm@12 pack dsh-scnet@0\.6\.9 --pack-destination .*packed[/\\]scnet$/u,
+   ))
+   for (const call of packs) expect(call[2].slice(-2)).toEqual(['--concurrency', concurrency ?? '4'])
+   for (const call of calls) {
+diff --git a/apps/desktop/tests/scnet-diagnostics-window.spec.ts b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+index fc723c0..90331f5 100644
+--- a/apps/desktop/tests/scnet-diagnostics-window.spec.ts
++++ b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
+@@ -52,7 +52,7 @@ it('accepts status reads only from its own top frame and cleans up on close', as
+   const window = await openScnetDiagnosticsWindow(resolveDesktopLocale('en'), {
+     read: async () => ({
+       overall: 'needs-setup',
+-      bundle: { state: 'ready', detail: '0.6.8' },
++      bundle: { state: 'ready', detail: '0.6.9' },
+       python: { state: 'ready', detail: '3.12.1 (python3)' },
+       credentials: { state: 'needs-setup', detail: 'not configured' },
+       backend: { state: 'needs-setup', detail: 'openapi' },
+diff --git a/apps/desktop/tests/scnet-diagnostics.spec.ts b/apps/desktop/tests/scnet-diagnostics.spec.ts
+index d6dc259..f41e0ab 100644
+--- a/apps/desktop/tests/scnet-diagnostics.spec.ts
++++ b/apps/desktop/tests/scnet-diagnostics.spec.ts
+@@ -13,7 +13,7 @@ function profile(bundles: string[], disabled = false): string {
+   const root = mkdtempSync(join(tmpdir(), 'dsh-scnet-diagnostics-'))
+   roots.push(root)
+   writeFileSync(join(root, 'package.json'), JSON.stringify({ dsh: { profile: { bundles } } }))
+-  if (disabled) writeFileSync(join(root, '.dsh-scnet.disabled'), '0.6.8\n')
++  if (disabled) writeFileSync(join(root, '.dsh-scnet.disabled'), '0.6.9\n')
+   return root
+ }
+ 
+@@ -37,7 +37,7 @@ describe('SCNet Desktop diagnostics', () => {
+     })
+     expect(result).toEqual({
+       overall: 'ready',
+-      bundle: { state: 'ready', detail: '0.6.8' },
++      bundle: { state: 'ready', detail: '0.6.9' },
+       python: { state: 'ready', detail: '3.12.1 (python3)' },
+       credentials: { state: 'ready', detail: 'configured' },
+       backend: { state: 'ready', detail: 'openapi' },
+@@ -56,7 +56,7 @@ describe('SCNet Desktop diagnostics', () => {
+       commandExists: () => false,
+     })
+     expect(result.overall).toBe('disabled')
+-    expect(result.bundle).toEqual({ state: 'disabled', detail: '0.6.8' })
++    expect(result.bundle).toEqual({ state: 'disabled', detail: '0.6.9' })
+     expect(result.credentials).toEqual({ state: 'needs-setup', detail: 'not configured' })
+   })
+ 
+-- 
+2.43.0
+

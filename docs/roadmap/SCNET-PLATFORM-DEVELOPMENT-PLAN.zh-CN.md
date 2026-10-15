@@ -17,12 +17,12 @@
 
 ### M1：预制 `dsh-scnet` Bundle 与离线 Desktop
 
-- [x] 固定 `dsh-scnet@0.6.8`、完整性和许可证记录
+- [x] 固定 `dsh-scnet@0.6.9`、完整性和许可证记录
 - [x] Desktop profile 默认激活，Web profile 保持显式安装
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 解释器路径注入和输入校验
 - [x] 本地只读 SCNet 连接诊断页
-- [x] 23 个补丁在全新上游树应用成功
+- [x] 24 个补丁在全新上游树应用成功
 - [x] Desktop 定向测试 `170/170`，host build 通过
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38233490072`）
 - [x] Debian 13 同等验收在手动多发行版 Run `38233720311` 通过；不作为日常 push 阻塞
@@ -267,7 +267,8 @@ Android 可以通过内置 connector tools 或受控远程 DSH Host 调用 SCNet
 `dsh-scnet/connector` 提供版本化操作定义、平台能力状态、PKCE 授权请求、授权回调校验、
 token exchange/refresh 请求构造、一次性回调消费、结构化错误信封和平台凭据存储适配抽象；
 Linux Desktop 补丁 `0018` 固定携带 `dsh-scnet@0.6.6`，补丁 `0019` 更新到
-`dsh-scnet@0.6.7`，补丁 `0020` 更新到 `dsh-scnet@0.6.8`，首次启动默认激活、旧默认
+`dsh-scnet@0.6.7`，补丁 `0020` 更新到 `dsh-scnet@0.6.8`，补丁 `0024` 更新到已发布的
+`dsh-scnet@0.6.9`，首次启动默认激活、旧默认
 profile 自动迁移，并保留显式禁用状态。
 补丁 `0021` 增加应用菜单中的 SCNet 本地连接诊断页，展示 Bundle、Python、backend、凭据
 就绪和认证状态；诊断只读本地文件与运行时，不发起网络请求，也不向 renderer 暴露 token、

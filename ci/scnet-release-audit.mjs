@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const DEFAULT_VERSION = '0.6.8'
+const DEFAULT_VERSION = '0.6.9'
 const PACKAGE_NAME = 'dsh-scnet'
 const SKILL_NAME = 'scnet-hpc'
 const DESCRIPTOR = 'desktop-packages.json'
