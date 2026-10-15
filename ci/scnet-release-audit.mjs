@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const DEFAULT_VERSION = '0.6.9'
+const DEFAULT_VERSION = '0.6.10'
 const PACKAGE_NAME = 'dsh-scnet'
 const SKILL_NAME = 'scnet-hpc'
 const DESCRIPTOR = 'desktop-packages.json'
@@ -186,6 +186,12 @@ function runtimeEvidence(appRoot, expectedVersion) {
 
   const skillRoot = join(bundleRoot, 'skills', SKILL_NAME)
   assert(existsSync(join(bundleRoot, 'cordis.patch.yml')), 'SCNet bundle: cordis.patch.yml is missing')
+  const callbackPath = join(bundleRoot, 'connector', 'callback.mjs')
+  const connectorIndexPath = join(bundleRoot, 'connector', 'index.mjs')
+  assert(existsSync(callbackPath), 'SCNet bundle: loopback callback listener is missing')
+  assert(existsSync(connectorIndexPath), 'SCNet bundle: connector entrypoint is missing')
+  assert(readFileSync(connectorIndexPath, 'utf8').includes('listenLoopbackCallback'),
+    'SCNet bundle: loopback callback listener is not exported')
   assert(existsSync(join(skillRoot, 'SKILL.md')), `SCNet bundle: ${SKILL_NAME} Skill is missing`)
   assert(readFileSync(join(skillRoot, 'VERSION'), 'utf8').trim() === expectedVersion,
     `SCNet bundle: ${SKILL_NAME} VERSION does not match ${expectedVersion}`)
@@ -235,6 +241,7 @@ function runtimeEvidence(appRoot, expectedVersion) {
     runtimeRelease: descriptor.release?.version,
     package: { name: bundleManifest.name, version: bundleManifest.version, license: bundleManifest.license },
     skill: { name: SKILL_NAME, version: expectedVersion },
+    loopbackCallback: { present: true, exported: true },
     files: files.length,
     scannedTextFiles,
     forbiddenPaths: 0,

@@ -13,8 +13,7 @@
 当前仓库：
 - 路径：/home/kylinlu/Downloads/agent/plugins/deepseek-harness-linux-desktop
 - 分支：main
-- 最新已提交：2cb3a31 (`fix(ci): keep Debian upgrade packages distinct`)
-- origin/main 已同步到 2cb3a31，工作树干净。开始工作前仍先执行 `git status --short --branch`，
+- 最新提交和 origin/main 必须实时查询。开始工作前先执行 `git status --short --branch`，
   不要把本文档的描述当作实时状态。
 
 项目边界：
@@ -26,24 +25,24 @@
   正式合同，也不能直接驱动客户端请求。
 - 不需要等待 SCNet 的工作继续推进；真实登录、刷新、撤销、账户关联和真实 OpenAPI 查询继续标记为阻塞。
 - Debian 候选升级放到后续 `run-multidistro` 手动阶段，不得成为日常开发阻塞。
-- 不要频繁发 release；没有完整 release-preflight 证据时不要创建 `.5` release。
+- 没有完整 release-preflight 证据时不要创建或发布新的 Linux Desktop release。
 
 仓库工作流约束：
 - dsh-scnet 的源头是 canonical `scnet-hpc`；任何 dsh-scnet 更新必须按多仓库同步流程从源头开始。
 - 不要只修改 dsh-scnet，也不要把本仓库补丁当成 dsh-scnet 的源头。
 - Desktop 上游修改必须通过新的 `patches/NNNN-*.patch` 表达，不能只改临时 upstream checkout。
 - 基线是上游 tag `dsh-v0.2.0-rc.2`。
-- 当前补丁序列为 24 个，`0023` 已修复补丁自身触发的 Linux lint 和 README 翻译配对失败，
-  `0024` 将 Desktop 固定 Bundle 更新到已发布的 `dsh-scnet@0.6.9`。
+- 当前补丁序列为 25 个，`0023` 已修复补丁自身触发的 Linux lint 和 README 翻译配对失败，
+  `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback listener 的 `dsh-scnet@0.6.10`。
 - 生成或修改补丁后，必须在干净上游树运行 `./apply.sh` 或等价的完整 `git am` 回放验证。
 - CI 改动改的是 `.github/workflows/*` 与 `ci/*`；只有这几类路径才会触发 push 基础验证。
 
 已完成的主要能力：
-- 固定并预置 `dsh-scnet@0.6.9`，记录完整性和许可证。
+- 固定并预置 `dsh-scnet@0.6.10`，记录完整性、许可证和 loopback listener 导出。
 - 新安装 profile 默认激活 dsh-scnet；用户显式禁用、旧默认 profile、自定义 profile 的升级迁移已验证。
 - 本地只读 SCNet 诊断页已加入 Desktop 菜单；只读 Bundle、Python、backend、凭据和认证状态，
   不发起网络请求，不暴露凭据。
-- OAuth2 + PKCE 是离线协议骨架，不代表真实 SCNet 登录已完成。
+- OAuth2 + PKCE 和 loopback callback listener 是离线协议骨架，不代表真实 SCNet 登录已完成。
 - Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
@@ -83,7 +82,7 @@ CI 状态（截至本文档）：
 
 完成标准：
 - 工作树干净，origin/main 已同步。
-- 24 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
+- 25 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
 - 定向测试和对应 CI 门禁有明确证据，release-preflight 没有未归因失败。
 - draft `.5` 的 deb checksum、安装、升级、`dsh://`、Wayland、基础会话均有证据；Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 证据。
 - 没有凭证、私有 endpoint 或未发布合同被写入仓库。
