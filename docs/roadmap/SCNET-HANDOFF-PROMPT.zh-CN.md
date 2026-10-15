@@ -13,8 +13,8 @@
 当前仓库：
 - 路径：/home/kylinlu/Downloads/agent/plugins/deepseek-harness-linux-desktop
 - 分支：main
-- 最新已提交：547b140 (`fix(ci): let released-deb verification match the tag's profile contract`)
-- origin/main 已同步到 547b140，工作树干净。开始工作前仍先执行 `git status --short --branch`，
+- 最新已提交：2cb3a31 (`fix(ci): keep Debian upgrade packages distinct`)
+- origin/main 已同步到 2cb3a31，工作树干净。开始工作前仍先执行 `git status --short --branch`，
   不要把本文档的描述当作实时状态。
 
 项目边界：
@@ -43,81 +43,48 @@
 - 本地只读 SCNet 诊断页已加入 Desktop 菜单；只读 Bundle、Python、backend、凭据和认证状态，
   不发起网络请求，不暴露凭据。
 - OAuth2 + PKCE 是离线协议骨架，不代表真实 SCNet 登录已完成。
-- Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收已通过。
+- Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
-- `547b140 fix(ci): let released-deb verification match the tag's profile contract`
-  为 `release-verify` 引入 `released-profile-expectation` 输入（默认严格 `default`），
-  使“校验已发布 deb”的会话期望能跟随被校验的 tag；旧 tag 传 `legacy`。
-- `2f24cac fix(ci): narrowly tolerate known coverage flakes`
-  把 coverage 容忍收紧为精确匹配：仅当唯一失败任务为 `test:coverage` 且失败用例恰好是 3 个已知用例时放行。
-- `6ac4b1b docs: record release gate run outcome`
-  把 Run `38343669703` 的失败归因写回 roadmap/handoff。
-- `8156729 docs: add copy-ready handoff prompt`
-  新增本交接提示词并登记到 docs/roadmap/README.md。
+- `2cb3a31 fix(ci): keep Debian upgrade packages distinct`
+  固定 Debian Docker context 中 base/candidate deb 的不同文件名，避免同名产物覆盖导致
+  “升级”实际重装旧包。
+- `d8f1640 fix(ci): preload ALSA for Debian candidate upgrades`
+  在 Debian 13 测试镜像中预装 `libasound2t64`，保证网络关闭后候选 Electron 进程仍能启动。
+- `d094d55 test(ci): cover Debian candidate upgrades`
+  增加 Debian 13 base→candidate 离线升级以及三种 profile 合同验收。
+- `08482cb fix(ci): export draft assets for read-only verification`
+  通过 workflow artifact 导出 draft release 资产，供只读 token 验证。
 
 CI 状态（截至本文档）：
-- Push 基础验证 Run `38377902138`（sha `547b140`）：success。
-  覆盖补丁应用、依赖安装、类型检查、Desktop 构建、package preflight、deb 构建+安装+会话审计。
-- 手动完整 preflight Run `38378042264`（sha `547b140`）：failure。
-  除 `upstream Linux gates` 外全部成功：`install+typecheck+package`（候选 deb 构建/安装/会话）、
-  `published deb - checksum, install and desktop session`（release-verify）、
-  `Wayland session smoke`、`deb upgrade path and AppArmor-hardened launch`、
-  `current candidate upgrade and profile migration` 均为 success。
-- `upstream Linux gates` job 内：Landlock launcher 构建、bwrap/Landlock 两个 sandbox 测试文件、
-  keyless agent smoke 均通过；唯一失败任务仍是 `test:coverage`，且 `linux-gates.log` 中失败用例恰好是这 3 个
-  已知上游竞态：
-    1. `scripts/persistence-schema.spec.ts > source compatibility authoring > does not qualify
-       unmarked additions or structurally equal unbound fields`
-    2. `apps/desktop/tests/welcome-startup.spec.ts > starts welcome onboarding without carrying
-       update focus into login or skip (Windows update=false)`
-    3. `apps/desktop/tests/welcome-startup.spec.ts > ... (Windows update=true)`
-- 失败根因已定位（不要再用猜测解释）：`Upstream Linux primary gate` 步骤以 `bash -e` 运行，
-  而步骤体在开头用 `pnpm run check:ci:linux-primary 2>&1 | tee linux-gates.log`，
-  下一行才取 `gate_status=${PIPESTATUS[0]}`。因为门禁失败时该 pipeline 返回非零，
-  在 `-e`（配合 `set -o pipefail`）下脚本会在取 `PIPESTATUS` 之前就中止，
-  `if [ "$gate_status" -ne 0 ]` 及其后的精确容忍块根本没有执行——所以 warning 没打印、门禁被判失败。
-  本地复现：同样的步骤结构在 `bash -e` 下 rc=1 且未到达容忍检查；在管线上方先加 `set +e` 后即可到达。
-
-已验证的修复：
-- `released-profile-expectation` 输入生效：Run `38378042264` 的 release-verify 用 `legacy` 通过；
-  `ci/desktop-session.sh` 中 `PROFILE_EXPECTATION=legacy` 会把 bundle 与 disabled-marker 两处断言降级为 SKIP。
-- coverage 容忍逻辑本身正确：用 Run `38378042264` 下载的 `linux-gates.log` 在本地重放该判断，
-  得到 `failing=<test:coverage >`、`known=3`、`unexpected=<>`，判定为“应放行”。
-  也就是说，问题不在匹配规则，而在上面的 `set -e` 提前中止。
+- Push 基础验证 Run `38525938104`（sha `d8f1640`）：success。
+- 完整 release-preflight Run `38506728139`：success。上游 Linux gate 明确只容忍 3 个已知
+  coverage 竞态；Landlock、bwrap、keyless smoke、Wayland、AppArmor、候选升级和包会话均通过。
+- draft 发布 Run `38516862762`：success，创建 draft `v0.2.0-rc.2-linux.5`。
+- draft `.5` 验证 Run `38521128578`：success，使用 `released-profile-expectation=default`
+  通过 checksum、安装、基础会话、`dsh://`、`.4 → .5`、AppArmor 和 Wayland。
+- Debian 多发行版 Run `38660453246`：success。日志确认使用不同的
+  `deepseek-harness-base.deb` 与 `deepseek-harness-candidate.deb`，离线安装、候选升级、
+  卸载以及 `legacy-default`、`disabled`、`custom` profile 合同均通过。
 
 发布现状：
 - 已发布 release：`v0.2.0-rc.2-linux.1` ~ `v0.2.0-rc.2-linux.4`；Latest 为 `.4`（2026-10-08）。
   这些 tag 都早于 SCNet 预置补丁系列，验证它们必须用 `released-profile-expectation=legacy`。
-- 尚未创建 `v0.2.0-rc.2-linux.5`。
+- `v0.2.0-rc.2-linux.5` 已创建但保持 draft；deb SHA-256 为
+  `13c01b002d9a9564fb531eb33a9cc61fad88550ab212671a1508bc588213db18`。
 - 发布入口是 `.github/workflows/publish-linux-desktop.yml`（`workflow_dispatch`，输入 `tag` 与 `draft`），
   它会重新构建、校验 checksum、安装并驱动会话，再 `gh release create`。
 
 推荐下一步（按顺序）：
-1. 修 `Upstream Linux primary gate` 的 `set -e` 提前中止：在 `pnpm run check:ci:linux-primary ... | tee`
-   之前加 `set +e`（或等价地把该 pipeline 放进 `if`/`||` 结构），确保 `gate_status=${PIPESTATUS[0]}`
-   一定执行；改完保留现有精确容忍块，不要放宽。
-2. 推送后重新跑**一次**完整 preflight，命令见下，确保它成为唯一的绿色证据：
-   `gh workflow run linux-desktop-verify.yml --repo lql341/deepseek-harness-linux-desktop --ref main \`
-   `  -f run-gates=true -f run-core=true -f run-hardening=true -f run-wayland=true \`
-   `  -f run-multidistro=false -f run-candidate-upgrade=true \`
-   `  -f release-tag=v0.2.0-rc.2-linux.4 -f previous-release-tag=v0.2.0-rc.2-linux.3 \`
-   `  -f candidate-base-tag=v0.2.0-rc.2-linux.4 -f released-profile-expectation=legacy`
-   解释门槛：只有当 `upstream Linux gates` 的唯一失败仍是那 3 个已知 coverage 用例时容忍才成立；
-   若出现别的失败任务或别的失败用例，必须当 patch-owned 问题排查，不得放宽。
-3. 门禁全绿后，用发布 workflow 创建 draft `.5`：
-   `gh workflow run publish-linux-desktop.yml --repo lql341/deepseek-harness-linux-desktop --ref main \`
-   `  -f tag=v0.2.0-rc.2-linux.5 -f draft=true`
-4. 等 draft `.5` 产出后，验证 draft 的 deb checksum、安装、`.4 → .5` 升级、`dsh://`、Wayland
-   和 Ubuntu 基础会话；这轮对 `.5` 用 `released-profile-expectation=default` 复验 release-verify。
-5. Debian 候选升级最后用 `run-multidistro=true` 手动执行，结果写回 roadmap 和 handoff。
-6. 每完成一个阶段就更新 checkbox、handoff 文档并提交/推送，保持本地与 origin/main 一致。
+1. 保持 draft `.5`，除非用户明确要求，不发布正式 release。
+2. 等待 SCNet 正式 OAuth2/API 合同、issuer、scope、测试账户和凭证；在此之前不接入真实登录或 OpenAPI。
+3. 每次接手仍先查询工作树、最近提交和最新 CI，不把本文历史 Run 号当作实时证据。
 
 完成标准：
 - 工作树干净，origin/main 已同步。
 - 23 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
 - 定向测试和对应 CI 门禁有明确证据，release-preflight 没有未归因失败。
-- draft `.5` 的 deb checksum、安装、升级、`dsh://`、Wayland、基础会话均有证据。
+- draft `.5` 的 deb checksum、安装、升级、`dsh://`、Wayland、基础会话均有证据；Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 证据。
 - 没有凭证、私有 endpoint 或未发布合同被写入仓库。
 ```
 

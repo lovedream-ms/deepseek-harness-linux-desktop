@@ -1,6 +1,6 @@
 # SCNet 开发交接与后续 TODO
 
-- 交接日期：2026-10-13
+- 交接日期：2026-10-15
 - 当前状态：`in progress`
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
@@ -26,10 +26,11 @@
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
 - [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
-- [ ] Debian 13 候选升级路径验收（后续手动多发行版阶段，非日常阻塞项）
-- [ ] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（Run `38343669703` 仍失败；已确认 sandbox confinement、Landlock launcher 和 keyless agent smoke 通过，唯一失败 job 为 upstream Linux primary gate，待读取 `linux-gates.log` 后归因）
+- [x] Debian 13 候选升级路径验收（Run `38660453246`；base/candidate 文件隔离，`legacy-default`、`disabled`、`custom` 均通过）
+- [x] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（Run `38506728139`；上游门禁仅精确容忍 3 个已知 coverage 竞态）
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
+- [x] draft `.5` 产物验证（发布 Run `38516862762`，验证 Run `38521128578`）
 
 ### M2：OAuth2 / Connector
 
@@ -173,10 +174,25 @@ Ubuntu 迁移由后续 Run `38336572137` 单独覆盖，Debian 迁移仍留在�
 手动 Run `38336572137` 进一步使用已发布 `v0.2.0-rc.2-linux.4` 和同一运行中构建的当前
 候选 deb，在 Ubuntu 24.04 完成包替换、旧 launcher 清理和三类 profile 验收：旧默认
 profile 自动加入 `dsh-scnet`，显式禁用 marker 和无 Bundle 状态保持，自定义 bundles 及
-自定义字段不被覆盖。Ubuntu 当前候选升级已关闭；Debian 升级留到后续手动多发行版阶段。
+自定义字段不被覆盖。
+
+完整 release-preflight Run `38506728139` 已成功；上游 Linux primary gate 的 warning
+只包含已知的 3 个 coverage 竞态，Landlock、bwrap、keyless smoke、Wayland、AppArmor、
+候选升级和其他发布腿均通过。随后发布 workflow Run `38516862762` 创建了保持 draft 的
+`v0.2.0-rc.2-linux.5`，deb SHA-256 为
+`13c01b002d9a9564fb531eb33a9cc61fad88550ab212671a1508bc588213db18`；Run `38521128578`
+以 `released-profile-expectation=default` 完成 draft checksum、安装、Ubuntu 会话、
+`dsh://`、`.4 → .5` 升级、AppArmor 和 Wayland 复验。draft `.5` 尚未发布。
+
+Debian 候选升级最初 Run `38522369417` 暴露两处测试基础问题：镜像未预装 Debian 13 的
+`libasound2t64`，且 base/candidate 同名 deb 在 Docker context 中互相覆盖。提交
+`d8f1640` 补齐 ALSA 运行库，提交 `2cb3a31` 固定为不同的
+`deepseek-harness-base.deb` / `deepseek-harness-candidate.deb` 文件名；Run
+`38660453246` 已通过 Debian 13 离线安装、升级、卸载、`dsh://` 和三种 profile 合同。
 
 Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`；补丁 `0022` 显式声明
-`libasound2`，并在后续 Run `38233720311` 中得到验证。
+`libasound2`，并在后续 Run `38233720311` 中得到验证。Debian 13 测试镜像另预装
+`libasound2t64`，供离线候选升级解析该运行库。
 
 ## 4. 当前边界与禁止事项
 
@@ -240,11 +256,11 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 - [x] 在全新 Ubuntu 24.04 环境完成 deb 安装、首次启动、`dsh://` 激活和卸载（Run `38233490072`）。
 - [x] Debian 13 同等验收已通过（Run `38233720311`）；后续由 `run-multidistro` 手动 job 复验，不作为日常阻塞门禁。
 - [x] 在 Ubuntu 24.04 完成公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）。
-- [ ] 在 Debian 13 完成候选 deb 升级路径验收（后续多发行版阶段，非阻塞）。
+- [x] 在 Debian 13 完成候选 deb 升级路径验收（Run `38660453246`；三种 profile 合同均通过）。
 - [x] 验证首次启动不访问 npm，能列出 active `dsh-scnet` 并加载 `scnet-hpc` Skill（Run `38233720311`）。
 - [x] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖（Run `38336572137`）。
 - [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
-- [ ] 将完整 deb 验收结果和 release artifact 校验值记录到发布证据中。
+- [x] 将完整 deb 验收结果和 draft `.5` release artifact 校验值记录到发布证据中。
 
 ### P2：真实沙盒与后续平台
 
