@@ -22,7 +22,8 @@ if [ -n "$BASE_DEB_FILE" ]; then
   BASE_DEB_FILE=$(realpath "$BASE_DEB_FILE")
 fi
 CONTEXT=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/dsh-debian13.XXXXXX")
-DEB_NAME=$(basename "$DEB_FILE")
+CANDIDATE_CONTEXT_NAME=deepseek-harness-candidate.deb
+BASE_CONTEXT_NAME=deepseek-harness-base.deb
 IMAGE="dsh-debian13-offline:$(sha256sum "$DEB_FILE" | cut -c1-12)"
 UPGRADE_IMAGE=
 
@@ -38,11 +39,11 @@ trap cleanup EXIT
 cp "$REPO_ROOT/ci/debian13-offline.Dockerfile" "$CONTEXT/Dockerfile"
 cp "$REPO_ROOT/ci/debian13-package-check.sh" "$CONTEXT/debian13-package-check.sh"
 cp "$REPO_ROOT/ci/desktop-session.sh" "$CONTEXT/desktop-session.sh"
-cp "$DEB_FILE" "$CONTEXT/$DEB_NAME"
+cp "$DEB_FILE" "$CONTEXT/$CANDIDATE_CONTEXT_NAME"
 
 docker build --pull \
-  --build-arg "DEB_FILE=$DEB_NAME" \
-  --build-arg "CANDIDATE_FILE=$DEB_NAME" \
+  --build-arg "DEB_FILE=$CANDIDATE_CONTEXT_NAME" \
+  --build-arg "CANDIDATE_FILE=$CANDIDATE_CONTEXT_NAME" \
   --tag "$IMAGE" "$CONTEXT"
 # Xvfb does not reliably model the plain second-launch restore path. That assertion is covered by
 # the real desktop-session jobs; keep the Debian container focused on offline install, first launch,
@@ -53,12 +54,11 @@ docker run --rm --network none --shm-size 512m \
 docker run --rm --network none "$IMAGE" uninstall
 
 if [ -n "$BASE_DEB_FILE" ]; then
-  BASE_DEB_NAME=$(basename "$BASE_DEB_FILE")
-  cp "$BASE_DEB_FILE" "$CONTEXT/$BASE_DEB_NAME"
+  cp "$BASE_DEB_FILE" "$CONTEXT/$BASE_CONTEXT_NAME"
   UPGRADE_IMAGE="dsh-debian13-upgrade:$(sha256sum "$BASE_DEB_FILE" "$DEB_FILE" | sha256sum | cut -c1-12)"
   docker build \
-    --build-arg "DEB_FILE=$BASE_DEB_NAME" \
-    --build-arg "CANDIDATE_FILE=$DEB_NAME" \
+    --build-arg "DEB_FILE=$BASE_CONTEXT_NAME" \
+    --build-arg "CANDIDATE_FILE=$CANDIDATE_CONTEXT_NAME" \
     --tag "$UPGRADE_IMAGE" "$CONTEXT"
   for profile_mode in legacy-default disabled custom; do
     docker run --rm --network none --shm-size 512m \
