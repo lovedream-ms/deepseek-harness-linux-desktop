@@ -29,6 +29,8 @@
 - [x] Ubuntu 24.04 从公开 `.4` 到当前候选 deb 的升级路径验收（Run `38336572137`）
 - [x] Debian 13 候选升级路径验收（Run `38660453246`；三种 profile 合同均通过，不作为日常 push 阻塞）
 - [x] Ubuntu release-preflight 全门禁通过并形成 `.5` 发布证据（Run `38506728139`；draft 验证 Run `38521128578`）
+- [x] canonical `scnet-hpc`、`dsh-scnet`、`codex-scnet-hpc` 按源头顺序发布 `0.6.10`，
+  Desktop 公开 `.6` 发布及精确字节复验通过（Runs `38709921855`、`38729878217`、`38731899365`）
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包敏感信息、内部 endpoint、缓存和生成文件扫描
 

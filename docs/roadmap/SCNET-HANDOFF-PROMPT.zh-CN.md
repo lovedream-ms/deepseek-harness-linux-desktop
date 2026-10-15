@@ -46,6 +46,13 @@
 - Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
+- `b8dc519 build(desktop): ship the SCNet loopback listener`
+  新增 `0025`，将 Desktop 固定 Bundle 更新为从 canonical 源头发布的 `dsh-scnet@0.6.10`，
+  并把 loopback listener 纳入发行审计。
+- `feca32e fix(ci): expect the updated SCNet bundle version`
+  更新 CI 对 Bundle 版本的明确期望。
+- `99f509d build(ci): advance the preinstalled SCNet bundle to 0.6.9`
+  历史中间版本；已由 `0025` 和正式源头版本 `0.6.10` 取代。
 - `2cb3a31 fix(ci): keep Debian upgrade packages distinct`
   固定 Debian Docker context 中 base/candidate deb 的不同文件名，避免同名产物覆盖导致
   “升级”实际重装旧包。
@@ -57,6 +64,13 @@
   通过 workflow artifact 导出 draft release 资产，供只读 token 验证。
 
 CI 状态（截至本文档）：
+- Desktop push Run `38708184304`（sha `b8dc519`）：success，覆盖补丁回放、typecheck、
+  deb 构建、`dsh-scnet@0.6.10` Bundle 审计、安装和会话。
+- `.6` 完整 release-preflight Run `38709921855`：success；上游 Linux gate、Landlock、
+  bwrap、keyless smoke、包会话和 Debian 13 多发行版验收均通过。
+- 公开 `.6` 发布 Run `38729878217`：success。
+- 公开 `.6` 发布字节验证 Run `38731899365`：success，覆盖 checksum、安装、基础会话、
+  `dsh://`、`.4 → .6`、AppArmor 和 Wayland。
 - Push 基础验证 Run `38525938104`（sha `d8f1640`）：success。
 - 完整 release-preflight Run `38506728139`：success。上游 Linux gate 明确只容忍 3 个已知
   coverage 竞态；Landlock、bwrap、keyless smoke、Wayland、AppArmor、候选升级和包会话均通过。
@@ -68,23 +82,30 @@ CI 状态（截至本文档）：
   卸载以及 `legacy-default`、`disabled`、`custom` profile 合同均通过。
 
 发布现状：
-- 已发布 release：`v0.2.0-rc.2-linux.1` ~ `v0.2.0-rc.2-linux.4`；Latest 为 `.4`（2026-10-08）。
-  这些 tag 都早于 SCNet 预置补丁系列，验证它们必须用 `released-profile-expectation=legacy`。
+- 最新公开 release 为 `v0.2.0-rc.2-linux.6`（2026-10-15），包含源头发布并同步的
+  `dsh-scnet@0.6.10`；deb SHA-256 为
+  `25b349f515d3fe9195dfb341dda09bebbe4db7e4f6c37c0b2304d0fd93be5837`。
+- `.1` ~ `.4` 都早于 SCNet 预置补丁系列，验证它们必须用
+  `released-profile-expectation=legacy`。
 - `v0.2.0-rc.2-linux.5` 已创建但保持 draft；deb SHA-256 为
-  `13c01b002d9a9564fb531eb33a9cc61fad88550ab212671a1508bc588213db18`。
+  `13c01b002d9a9564fb531eb33a9cc61fad88550ab212671a1508bc588213db18`，其旧 Bundle
+  资产不得视为当前发布。
 - 发布入口是 `.github/workflows/publish-linux-desktop.yml`（`workflow_dispatch`，输入 `tag` 与 `draft`），
   它会重新构建、校验 checksum、安装并驱动会话，再 `gh release create`。
 
 推荐下一步（按顺序）：
-1. 保持 draft `.5`，除非用户明确要求，不发布正式 release。
+1. 保持 draft `.5` 不变；不要复用或公开其旧 Bundle 资产。
 2. 等待 SCNet 正式 OAuth2/API 合同、issuer、scope、测试账户和凭证；在此之前不接入真实登录或 OpenAPI。
-3. 每次接手仍先查询工作树、最近提交和最新 CI，不把本文历史 Run 号当作实时证据。
+3. 后续所有 `scnet-hpc` / `dsh-scnet` 版本继续从 canonical 源头发布，并同步
+   `dsh-scnet`、`codex-scnet-hpc` 和 Desktop 固定 Bundle。
+4. 每次接手仍先查询工作树、最近提交和最新 CI，不把本文历史 Run 号当作实时证据。
 
 完成标准：
 - 工作树干净，origin/main 已同步。
 - 25 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
 - 定向测试和对应 CI 门禁有明确证据，release-preflight 没有未归因失败。
-- draft `.5` 的 deb checksum、安装、升级、`dsh://`、Wayland、基础会话均有证据；Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 证据。
+- 公开 `.6` 的 deb checksum、安装、升级、`dsh://`、AppArmor、Wayland、基础会话均有证据；
+  Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 和 `38709921855` 证据。
 - 没有凭证、私有 endpoint 或未发布合同被写入仓库。
 ```
 

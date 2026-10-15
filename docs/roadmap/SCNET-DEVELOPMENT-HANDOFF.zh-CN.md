@@ -34,6 +34,10 @@
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 - [x] draft `.5` 产物验证（发布 Run `38516862762`，验证 Run `38521128578`）
+- [x] canonical `scnet-hpc`、`dsh-scnet` npm/GitHub、`codex-scnet-hpc` 和 Desktop Bundle
+  已按源头顺序发布/同步到 `0.6.10`
+- [x] 公开 `v0.2.0-rc.2-linux.6` 发布与发布字节复验（预检 Run `38709921855`，
+  发布 Run `38729878217`，验证 Run `38731899365`）
 
 ### M2：OAuth2 / Connector
 
@@ -61,10 +65,10 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `scnet-hpc`（canonical） | `main` / `c7dfbe2` | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10` |
+| `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到 `0.6.10`；默认激活并保留用户显式禁用状态 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交（功能提交 `b8dc519`） | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
 | 上游临时验证树 | `e09427d` / tree `73a48539c00a01aed0dee8728ebc6b901a1cb368` | 补丁 `0018`–`0025` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
 
 ## 2. 已完成内容
@@ -201,6 +205,23 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 `libasound2`，并在后续 Run `38233720311` 中得到验证。Debian 13 测试镜像另预装
 `libasound2t64`，供离线候选升级解析该运行库。
 
+`0.6.10` 发布从 canonical `scnet-hpc` 开始：canonical release Run `38705899989` 成功；
+同步检查等待修复后的 Validate / `codex-scnet-hpc` / `dsh-scnet` Run 分别为
+`38708420158`、`38708420096`、`38708420092`，均成功。`dsh-scnet@0.6.10` npm/GitHub
+发布 Run `38706144374` 成功，`codex-scnet-hpc v0.6.10` 发布 Run `38706136304` 成功。
+Desktop push Run `38708184304` 成功，确认 `0025`、Bundle 审计、安装和会话链路。
+
+公开 `.6` 发布前，完整 release-preflight Run `38709921855` 成功：上游 Linux primary
+gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行版验收均通过。
+发布 workflow Run `38729878217` 从 `main@b8dc519` 重新应用 25 个补丁、构建并复验精确
+字节，随后公开 `v0.2.0-rc.2-linux.6`；patched tree 为
+`73a48539c00a01aed0dee8728ebc6b901a1cb368`，deb SHA-256 为
+`25b349f515d3fe9195dfb341dda09bebbe4db7e4f6c37c0b2304d0fd93be5837`。
+发布后独立 Run `38731899365` 通过 checksum、安装、Desktop session、`dsh://`、
+`.4 → .6` 升级、AppArmor 和 Wayland。旧 `v0.2.0-rc.2-linux.5` 继续保持 draft，
+不得将其旧 `0.6.8` Bundle 资产视为当前发布。公开 release：
+`https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.0-rc.2-linux.6`。
+
 ## 4. 当前边界与禁止事项
 
 - M0 外部合同尚未冻结，因此不得写入、猜测或硬编码 SCNet 内部 issuer、endpoint、client ID 或 scope。
@@ -268,6 +289,8 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 - [x] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖（Run `38336572137`）。
 - [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
 - [x] 将完整 deb 验收结果和 draft `.5` release artifact 校验值记录到发布证据中。
+- [x] 按 canonical 源头顺序发布 `0.6.10`，并将公开 `.6` 的 checksum、安装、升级、
+  `dsh://`、AppArmor、Wayland 和 Desktop session 证据记录到发布交接中。
 
 ### P2：真实沙盒与后续平台
 
