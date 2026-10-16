@@ -13,7 +13,7 @@
 当前仓库：
 - 路径：以当前工作区为准，先执行 `git rev-parse --show-toplevel`；不要假设固定路径。
 - 分支：先执行 `git status --short --branch`、`git branch -vv` 和
-  `git rev-parse HEAD origin/main`。当前交接基线为 `HEAD == origin/main == f9f079d`；
+  `git rev-parse HEAD origin/main`。当前交接基线为 `HEAD == origin/main == 35bbec0`；
   本工作区可能显示为 detached `HEAD`，不要把 detached 状态误判为代码不同步。
 - 最新提交和 origin/main 必须实时查询。开始工作前先执行
   `git status --short --branch`、`git log -6 --oneline` 和
@@ -55,6 +55,8 @@
 - Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
+- `35bbec0 docs: refresh SCNet handoff prompt`
+  明确公开 `.6`、历史 draft `.5` 与当前 `main` 的功能边界。
 - `f9f079d feat(desktop): add offline SCNet auth callback skeleton`
   新增 `0029`，提供严格的 `dsh://auth/scnet` 离线回调解析、一次性 state 消费和
   Linux 第二次启动参数转发；不执行 token exchange，也不访问真实网络。
@@ -101,22 +103,25 @@ CI 状态（截至本文档）：
 - 最新公开 release 为 `v0.2.0-rc.2-linux.6`（2026-10-15），包含源头发布并同步的
   `dsh-scnet@0.6.10`；deb SHA-256 为
   `25b349f515d3fe9195dfb341dda09bebbe4db7e4f6c37c0b2304d0fd93be5837`。
+- `.6` 发布时的 patched tree 为 `73a48539c00a01aed0dee8728ebc6b901a1cb368`，
+  功能范围到 `0025`；当前 `main` 后续新增的 `0026`–`0029` 尚未进入任何公开 deb。
 - 当前没有 `.7`；除非用户明确要求且完整 release-preflight 重新通过，否则不要创建或发布新
   Desktop release。
 - `.1` ~ `.4` 都早于 SCNet 预置补丁系列，验证它们必须用
   `released-profile-expectation=legacy`。
-- `v0.2.0-rc.2-linux.5` 已创建但保持 draft；deb SHA-256 为
-  `13c01b002d9a9564fb531eb33a9cc61fad88550ab212671a1508bc588213db18`，其旧 Bundle
-  资产不得视为当前发布。
+- `v0.2.0-rc.2-linux.5` 是更早的历史 draft，patched tree 为
+  `da529a2abf92fffc03e8ecdd55f0fff48b25895f`，其旧 Bundle 资产不得视为当前发布；
+  保留它只用于审计和回溯，不用于安装、升级或新验证。
 - 发布入口是 `.github/workflows/publish-linux-desktop.yml`（`workflow_dispatch`，输入 `tag` 与 `draft`），
   它会重新构建、校验 checksum、安装并驱动会话，再 `gh release create`。
 
 推荐下一步（按顺序）：
-1. 保持 draft `.5` 不变；不要复用或公开其旧 Bundle 资产。
-2. 保留正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证的空位；在合同和凭证
+1. 保留正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证的空位；在合同和凭证
    未提供前，不接入真实登录、刷新、撤销、账户关联或 OpenAPI。
-3. 不接入 upstream alpha。后续所有 `scnet-hpc` / `dsh-scnet` 版本继续从 canonical 源头发布，并同步
+2. 不接入 upstream alpha。后续所有 `scnet-hpc` / `dsh-scnet` 版本继续从 canonical 源头发布，并同步
    `dsh-scnet`、`codex-scnet-hpc` 和 Desktop 固定 Bundle。
+3. 若要让用户安装包看到 `0026`–`0029` 的状态入口、Secret Service 和离线回调骨架，
+   先重新执行完整 release-preflight，再由用户明确决定是否创建下一个 Desktop release。
 4. 每次接手仍先查询工作树、最近提交和最新 CI，不把本文历史 Run 号当作实时证据。
 
 完成标准：
