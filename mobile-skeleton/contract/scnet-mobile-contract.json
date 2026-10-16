@@ -1,0 +1,54 @@
+{
+  "contractVersion": "0.1.0",
+  "sourceBundle": "dsh-scnet@0.6.10",
+  "status": "offline-skeleton",
+  "network": {
+    "enabled": false,
+    "issuer": null,
+    "authorizationEndpoint": null,
+    "tokenEndpoint": null,
+    "revokeEndpoint": null,
+    "jwksEndpoint": null,
+    "clientId": null,
+    "redirectUri": null
+  },
+  "auth": {
+    "flow": "authorization-code-pkce",
+    "callback": "platform-adapter",
+    "stateReplay": "reject",
+    "scopeContract": "pending-formal-scnet-contract"
+  },
+  "operations": {
+    "login": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "status": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "refresh": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "logout": { "mutatesRemote": true, "supportsDryRun": false, "scope": null },
+    "linkAccount": { "mutatesRemote": true, "supportsDryRun": true, "scope": null },
+    "unlinkAccount": { "mutatesRemote": true, "supportsDryRun": true, "scope": null },
+    "listRegions": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "listSchedulers": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "listQueues": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "submitJob": { "mutatesRemote": true, "supportsDryRun": true, "scope": null },
+    "getJob": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "cancelJob": { "mutatesRemote": true, "supportsDryRun": true, "scope": null },
+    "listFiles": { "mutatesRemote": false, "supportsDryRun": false, "scope": null },
+    "transferFile": { "mutatesRemote": true, "supportsDryRun": true, "scope": null }
+  },
+  "capabilityStates": [
+    "supported",
+    "unsupported",
+    "requires-remote-host"
+  ],
+  "platforms": {
+    "android": {
+      "status": "skeleton",
+      "transport": "not-configured",
+      "secureStore": "adapter-interface-only"
+    },
+    "harmonyos": {
+      "status": "skeleton",
+      "transport": "not-configured",
+      "secureStore": "adapter-interface-only"
+    }
+  }
+}

@@ -57,8 +57,10 @@
 
 ### M4-M6：移动端、平台扩展与稳定发布
 
+- [x] Android / HarmonyOS contract-first 离线骨架已加入 `mobile-skeleton/`；
+  只包含共享状态机、平台适配器接口和无网络 conformance test
 - [ ] Android OAuth2/OpenAPI connector 与 Keystore
-- [ ] iOS/HarmonyOS 最小连接器与安全存储
+- [ ] iOS/HarmonyOS 最小连接器与安全存储（鸿蒙已完成接口骨架，真实工程待工具链）
 - [ ] 信创 Linux/更多发行版能力矩阵
 - [ ] CI、安全响应、回滚包、兼容矩阵和稳定发布证据
 

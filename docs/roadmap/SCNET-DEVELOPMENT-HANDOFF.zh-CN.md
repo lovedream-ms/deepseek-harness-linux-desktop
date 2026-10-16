@@ -61,6 +61,14 @@
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
 - [ ] 凭据清理、锁屏和无桌面会话测试
 
+### M4-M6：移动端骨架
+
+- [x] `mobile-skeleton/` 共享 contract manifest 和离线 conformance tests
+- [x] Android/Kotlin connector 状态机与 SecureStore/BrowserAuthSession 接口骨架
+- [x] HarmonyOS/ArkTS connector 状态机与平台适配接口骨架
+- [ ] Android APK / HarmonyOS HAP 工具链和真实平台工程
+- [ ] 真实 OAuth2、OpenAPI、Keystore/安全存储接入
+
 ## 1. 当前提交与仓库对应关系
 
 | 仓库 | 分支/提交 | 当前交付 |
