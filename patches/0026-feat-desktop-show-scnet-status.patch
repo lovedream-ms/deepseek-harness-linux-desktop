@@ -1,0 +1,272 @@
+From 177cc37a01c97a54325a470ddd7538490d27e0a2 Mon Sep 17 00:00:00 2001
+From: linux-port <linux-port@localhost>
+Date: Fri, 16 Oct 2026 09:39:42 +0800
+Subject: [PATCH] feat(desktop): show SCNet status in the main window
+
+---
+ apps/desktop/src/ipc.ts                       |   2 +
+ apps/desktop/src/main.ts                      |  11 ++
+ apps/desktop/src/preload-app.ts               |   2 +
+ apps/desktop/src/preload-scnet-status.ts      | 115 ++++++++++++++++++
+ apps/desktop/tests/preload-app.spec.ts        |   1 +
+ .../tests/preload-scnet-status.spec.ts        |  61 ++++++++++
+ 6 files changed, 192 insertions(+)
+ create mode 100644 apps/desktop/src/preload-scnet-status.ts
+ create mode 100644 apps/desktop/tests/preload-scnet-status.spec.ts
+
+diff --git a/apps/desktop/src/ipc.ts b/apps/desktop/src/ipc.ts
+index 9725318..cf62236 100644
+--- a/apps/desktop/src/ipc.ts
++++ b/apps/desktop/src/ipc.ts
+@@ -33,6 +33,8 @@ export const DESKTOP_IPC = {
+   windowsMenu: 'dsh-desktop:windows-menu',
+   scnetDiagnostics: 'dsh-desktop:scnet-diagnostics',
+   scnetDiagnosticsClose: 'dsh-desktop:scnet-diagnostics-close',
++  scnetStatus: 'dsh-desktop:scnet-status',
++  scnetStatusOpenDiagnostics: 'dsh-desktop:scnet-status-open-diagnostics',
+ } as const
+ 
+ /** Desktop release update state rendered by desktop-owned UI. */
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 5eb5cca..45012e9 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -763,6 +763,17 @@ async function main(): Promise<void> {
+     platformView.setBounds(platformBounds(bounds))
+   })
+   ipcMain.handle(PLATFORM_IPC.close, (event) => { assertMainApplication(event); platformView.close() })
++  ipcMain.handle(DESKTOP_IPC.scnetStatus, async (event) => {
++    assertMainApplication(event)
++    return {
++      locale: locale.id,
++      diagnostics: await readScnetDiagnostics({ profilePath: activeProject, environment: hostEnvironment }),
++    }
++  })
++  ipcMain.handle(DESKTOP_IPC.scnetStatusOpenDiagnostics, async (event) => {
++    assertMainApplication(event)
++    await showScnetDiagnostics()
++  })
+   // Only the main window may synchronize its palette with the native material.
+   ipcMain.on(DESKTOP_IPC.nativeThemeSet, (event, source: unknown) => {
+     if (mainWindow === undefined || event.sender !== mainWindow.webContents) return
+diff --git a/apps/desktop/src/preload-app.ts b/apps/desktop/src/preload-app.ts
+index f590b8b..970e0b0 100644
+--- a/apps/desktop/src/preload-app.ts
++++ b/apps/desktop/src/preload-app.ts
+@@ -9,6 +9,7 @@ import { syncNativeTheme } from './preload-theme.ts'
+ import { syncWindowsAppearance } from './preload-windows.ts'
+ import { installMandatoryUpdateOverlay } from './preload-mandatory-overlay.ts'
+ import { createDesktopBrowserBridge } from './preload-browser.ts'
++import { installScnetStatusSurface } from './preload-scnet-status.ts'
+ 
+ function createProductApi(): DshDesktopProductApi {
+   return {
+@@ -104,4 +105,5 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
+     read: () => ipcRenderer.invoke(DESKTOP_IPC.localeBootstrap),
+     onChange: (locale: string) => { ipcRenderer.send(DESKTOP_IPC.localeChanged, locale) },
+   })
++  installScnetStatusSurface()
+ }
+diff --git a/apps/desktop/src/preload-scnet-status.ts b/apps/desktop/src/preload-scnet-status.ts
+new file mode 100644
+index 0000000..9d62afb
+--- /dev/null
++++ b/apps/desktop/src/preload-scnet-status.ts
+@@ -0,0 +1,115 @@
++/** Main-window SCNet status surface; it only shows redacted local readiness facts. */
++
++import { ipcRenderer } from 'electron'
++import { DESKTOP_IPC } from './ipc.ts'
++import type { ScnetDiagnostics } from './scnet-diagnostics.ts'
++
++interface ScnetStatusSnapshot {
++  readonly locale: 'en' | 'zh-CN'
++  readonly diagnostics: ScnetDiagnostics
++}
++
++interface ScnetStatusBridge {
++  read(): Promise<ScnetStatusSnapshot>
++  openDiagnostics(): Promise<void>
++}
++
++const bridge: ScnetStatusBridge = {
++  read: () => ipcRenderer.invoke(DESKTOP_IPC.scnetStatus) as Promise<ScnetStatusSnapshot>,
++  openDiagnostics: () => ipcRenderer.invoke(DESKTOP_IPC.scnetStatusOpenDiagnostics) as Promise<void>,
++}
++
++const copy = {
++  en: {
++    title: 'SCNet',
++    action: 'View diagnostics',
++    ready: 'Ready',
++    needsSetup: 'Authorization required',
++    unavailable: 'Local dependency unavailable',
++    disabled: 'Disabled',
++  },
++  'zh-CN': {
++    title: 'SCNet',
++    action: '查看诊断',
++    ready: '已就绪',
++    needsSetup: '需要授权',
++    unavailable: '本地依赖不可用',
++    disabled: '已禁用',
++  },
++} as const
++
++function install(): void {
++  if (document.querySelector('[data-dsh-scnet-status]') !== null) return
++  const host = document.createElement('div')
++  host.dataset.dshScnetStatus = ''
++  const shadow = host.attachShadow({ mode: 'open' })
++  const style = document.createElement('style')
++  style.textContent = `
++    :host { all: initial; }
++    .surface { align-items: center; backdrop-filter: blur(14px); background: color-mix(in srgb, Canvas 88%, transparent);
++      border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 10px; box-shadow: 0 5px 22px rgb(0 0 0 / 12%);
++      color: CanvasText; display: flex; font: 12px/16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++      gap: 9px; max-width: min(360px, calc(100vw - 28px)); padding: 9px 10px 9px 11px; }
++    .dot { background: #d28c24; border-radius: 50%; flex: 0 0 8px; height: 8px; width: 8px; }
++    .dot[data-state="ready"] { background: #1f9d68; }
++    .dot[data-state="unavailable"] { background: #c74b4b; }
++    .dot[data-state="disabled"] { background: #8d9298; }
++    .copy { display: grid; gap: 1px; min-width: 0; }
++    .title { font-weight: 650; }
++    .detail { color: color-mix(in srgb, CanvasText 66%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++    button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 3px 0 3px 5px; white-space: nowrap; }
++    button:hover { text-decoration: underline; }
++    button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
++    .dismiss { color: color-mix(in srgb, CanvasText 52%, transparent); font-size: 16px; line-height: 16px; padding: 0 2px 2px 3px; }
++  `
++  const surface = document.createElement('div')
++  surface.className = 'surface'
++  const dot = document.createElement('span')
++  dot.className = 'dot'
++  dot.setAttribute('aria-hidden', 'true')
++  const content = document.createElement('span')
++  content.className = 'copy'
++  const title = document.createElement('span')
++  title.className = 'title'
++  const detail = document.createElement('span')
++  detail.className = 'detail'
++  content.append(title, detail)
++  const action = document.createElement('button')
++  action.type = 'button'
++  const dismiss = document.createElement('button')
++  dismiss.className = 'dismiss'
++  dismiss.type = 'button'
++  dismiss.textContent = '×'
++  dismiss.setAttribute('aria-label', 'Dismiss')
++  surface.append(dot, content, action, dismiss)
++  shadow.append(style, surface)
++  Object.assign(host.style, {
++    bottom: '14px',
++    position: 'fixed',
++    right: '14px',
++    zIndex: '2147483640',
++  })
++  document.body.append(host)
++  dismiss.addEventListener('click', () => { host.remove() })
++  action.addEventListener('click', () => { void bridge.openDiagnostics().catch(() => {}) })
++  void bridge.read().then(({ locale, diagnostics }) => {
++    const m = locale === 'zh-CN' ? copy['zh-CN'] : copy.en
++    const state = diagnostics.overall
++    const status = state === 'ready' ? m.ready
++      : state === 'needs-setup' ? m.needsSetup
++        : state === 'disabled' ? m.disabled : m.unavailable
++    title.textContent = m.title
++    detail.textContent = `Bundle ${diagnostics.bundle.detail} · ${status}`
++    dot.dataset.state = state
++    action.textContent = m.action
++    action.setAttribute('aria-label', m.action)
++    dismiss.setAttribute('aria-label', locale === 'zh-CN' ? '关闭' : 'Dismiss')
++  }).catch(() => {
++    host.remove()
++  })
++}
++
++export function installScnetStatusSurface(): void {
++  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true })
++  else install()
++}
+diff --git a/apps/desktop/tests/preload-app.spec.ts b/apps/desktop/tests/preload-app.spec.ts
+index e238f58..8b9a420 100644
+--- a/apps/desktop/tests/preload-app.spec.ts
++++ b/apps/desktop/tests/preload-app.spec.ts
+@@ -15,6 +15,7 @@ vi.mock('../src/preload-platform.ts', () => ({ markDocumentPlatform: vi.fn(), sy
+ vi.mock('../src/preload-theme.ts', () => ({ syncNativeTheme: vi.fn() }))
+ vi.mock('../src/preload-windows.ts', () => ({ syncWindowsAppearance: vi.fn() }))
+ vi.mock('../src/preload-mandatory-overlay.ts', () => ({ installMandatoryUpdateOverlay: vi.fn() }))
++vi.mock('../src/preload-scnet-status.ts', () => ({ installScnetStatusSurface: vi.fn() }))
+ 
+ beforeEach(() => { vi.stubGlobal('process', { ...process, isMainFrame: true }) })
+ afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); vi.resetModules() })
+diff --git a/apps/desktop/tests/preload-scnet-status.spec.ts b/apps/desktop/tests/preload-scnet-status.spec.ts
+new file mode 100644
+index 0000000..c1ae172
+--- /dev/null
++++ b/apps/desktop/tests/preload-scnet-status.spec.ts
+@@ -0,0 +1,61 @@
++// @vitest-environment jsdom
++import { beforeEach, describe, expect, it, vi } from 'vitest'
++
++const invoke = vi.fn()
++vi.mock('electron', () => ({ ipcRenderer: { invoke } }))
++
++describe('SCNet main-window status surface', () => {
++  beforeEach(() => {
++    vi.resetModules()
++    invoke.mockReset()
++    document.body.innerHTML = ''
++    Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' })
++  })
++
++  it('renders the local bundle and authorization state without credential values', async () => {
++    invoke.mockResolvedValue({
++      locale: 'zh-CN',
++      diagnostics: {
++        overall: 'needs-setup',
++        bundle: { state: 'ready', detail: '0.6.10' },
++        python: { state: 'ready', detail: 'Python 3.12' },
++        credentials: { state: 'needs-setup', detail: 'Secret Service' },
++        backend: { state: 'ready', detail: 'openapi' },
++        authentication: { state: 'needs-setup', detail: 'authorization required' },
++      },
++    })
++    const { installScnetStatusSurface } = await import('../src/preload-scnet-status.ts')
++    installScnetStatusSurface()
++    await vi.waitFor(() => { expect(document.querySelector('[data-dsh-scnet-status]')).not.toBeNull() })
++    const host = document.querySelector('[data-dsh-scnet-status]')!
++    expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('Bundle 0.6.10')
++    expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('需要授权')
++    expect(invoke).toHaveBeenCalledWith('dsh-desktop:scnet-status')
++  })
++
++  it('opens diagnostics from the action and can be dismissed', async () => {
++    invoke.mockResolvedValue({
++      locale: 'en',
++      diagnostics: {
++        overall: 'ready',
++        bundle: { state: 'ready', detail: '0.6.10' },
++        python: { state: 'ready', detail: 'Python 3.12' },
++        credentials: { state: 'ready', detail: 'configured' },
++        backend: { state: 'ready', detail: 'openapi' },
++        authentication: { state: 'needs-setup', detail: 'authorization required' },
++      },
++    })
++    const { installScnetStatusSurface } = await import('../src/preload-scnet-status.ts')
++    installScnetStatusSurface()
++    const host = await vi.waitFor(() => {
++      const value = document.querySelector('[data-dsh-scnet-status]')
++      if (value === null) throw new Error('surface not mounted')
++      return value
++    })
++    const shadow = host.shadowRoot!
++    shadow.querySelector('button:not(.dismiss)')?.dispatchEvent(new MouseEvent('click'))
++    await vi.waitFor(() => { expect(invoke).toHaveBeenCalledWith('dsh-desktop:scnet-status-open-diagnostics') })
++    shadow.querySelector('.dismiss')?.dispatchEvent(new MouseEvent('click'))
++    expect(document.querySelector('[data-dsh-scnet-status]')).toBeNull()
++  })
++})
+-- 
+2.43.0
+

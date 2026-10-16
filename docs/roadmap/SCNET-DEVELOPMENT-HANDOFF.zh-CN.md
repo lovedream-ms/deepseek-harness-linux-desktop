@@ -21,7 +21,7 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 25 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
+- [x] 26 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback callback listener 的 `0.6.10`
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] `dsh-scnet@0.6.10` connector 测试 `26/26` 和 package validate 通过；npm 包为 55 个文件、
@@ -76,8 +76,8 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交（功能提交 `b8dc519`） | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `e09427d` / tree `73a48539c00a01aed0dee8728ebc6b901a1cb368` | 补丁 `0018`–`0025` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源 |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `4565fd1` / tree `a09c049add170602ab4cd8187e9ce976cf4dcea7` | 补丁 `0018`–`0026` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
 
@@ -105,7 +105,7 @@
 - 新安装的默认 Desktop profile 自动启用 `dsh-scnet`。
 - 旧默认 profile 自动迁移；用户显式禁用后写入 `.dsh-scnet.disabled`，后续升级不重新启用。
 - Web profile 仍保持显式安装，不自动加入 `dsh-scnet`。
-- 应用菜单新增“SCNet 连接诊断…”，显示 Bundle、Python、backend、凭据就绪和认证状态；诊断只读本地信息，不发起网络请求。
+- 应用菜单新增“SCNet 连接诊断…”，主窗口右下角也显示可关闭的 SCNet 状态入口；两者显示 Bundle、Python、backend、凭据就绪和认证状态，只读本地信息，不发起网络请求。
 - 诊断窗口通过隔离 preload 和来源校验提供状态，不向 renderer 暴露 token、AK/SK 或服务端免登凭证；在未收到正式合同/凭证时，认证状态保持“需要授权”。
 
 ## 3. 验证证据
@@ -139,9 +139,15 @@ git diff --check
 `0021` 的临时上游验证已通过，`0022` 在其基础上补充运行时依赖：
 
 - 新增 SCNet 状态读取、诊断窗口、preload 和静态 renderer 资源。
+- `0026` 在主窗口右下角增加可关闭的状态入口，显示 `dsh-scnet@0.6.10` 和“需要授权”，
+  点击后打开现有本地诊断页；状态读取和打开动作均经过主窗口来源校验。
 - 定向 Desktop 测试 `170/170` 通过；新增测试覆盖 profile 禁用、Python 缺失、本地 metadata、
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
+- 26 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree
+  `a09c049add170602ab4cd8187e9ce976cf4dcea7`；Desktop 定向测试 `145/145`、TypeScript
+  检查和新增文件 oxlint 通过。全仓 `lint:contracts-ready` 仍被上游既有的大量
+  `no-unsafe-*` 错误阻塞，未归因于 `0026`。
 - `0022` 的 Desktop 定向打包测试通过，并在生成 deb 的 control 字段中确认包含 `libasound2`。
 - `0023` 的 `pnpm run lint:contracts-ready`、Desktop 相关 4 个测试文件（50 passed，1 skipped）
   和 `verify-translation-pairing apps/desktop/README.md` 均通过；`0023` 已在基线 tag 上与前 22 个补丁顺序重放成功。
