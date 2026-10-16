@@ -10,9 +10,9 @@ Upstream ships macOS and Windows only — its own `apps/desktop/README.md` state
 `linux-x64` target must be rejected. This repository is the set of diffs that opens that
 path up.
 
-> **Status: Linux x64 verified on Ubuntu 24.04 LTS and Debian 13 (trixie) in GitHub Actions, and locally.** The existing Linux release path has been compiled, packaged, and smoke-tested on Ubuntu 24.04 x86_64; the deb installation chain also runs inside a Debian 13 container. The twenty-six-patch series applies cleanly, and the SCNet bundle patches are typechecked with targeted Desktop tests. Linux releases use the deb package. `patches/0009`–`0012` fix what the first real Linux runs surfaced: a `TS2339` typecheck failure, a `dsh` launcher that could not find its payload, an upload-plan error that dropped the environment name, and four style/repository-reference errors rejected by upstream's Linux gate. `patches/0018` preinstalls `dsh-scnet@0.6.6`; `patches/0019` advances to `0.6.7`; `patches/0020` advances the fixed bundle to `dsh-scnet@0.6.8` with the connector session and error contract; `patches/0021` adds a local, read-only SCNet diagnostics page to the Desktop menu; `patches/0022` declares the ALSA runtime dependency required by Electron on clean Debian/Ubuntu installs; `patches/0023` closes the Linux gate's patch-owned lint and translation-pairing failures; `patches/0024` advances the fixed bundle to `dsh-scnet@0.6.9`; `patches/0025` advances it to the published `dsh-scnet@0.6.10` with the protocol-neutral loopback callback listener; `patches/0026` adds a compact, dismissible SCNet status surface to the main window, without adding credentials or network endpoints.
+> **Status: Linux x64 verified on Ubuntu 24.04 LTS and Debian 13 (trixie) in GitHub Actions, and locally.** The existing Linux release path has been compiled, packaged, and smoke-tested on Ubuntu 24.04 x86_64; the deb installation chain also runs inside a Debian 13 container. The twenty-seven-patch series applies cleanly, and the SCNet bundle patches are typechecked with targeted Desktop tests. Linux releases use the deb package. `patches/0009`–`0012` fix what the first real Linux runs surfaced: a `TS2339` typecheck failure, a `dsh` launcher that could not find its payload, an upload-plan error that dropped the environment name, and four style/repository-reference errors rejected by upstream's Linux gate. `patches/0018` preinstalls `dsh-scnet@0.6.6`; `patches/0019` advances to `0.6.7`; `patches/0020` advances the fixed bundle to `dsh-scnet@0.6.8` with the connector session and error contract; `patches/0021` adds a local, read-only SCNet diagnostics page to the Desktop menu; `patches/0022` declares the ALSA runtime dependency required by Electron on clean Debian/Ubuntu installs; `patches/0023` closes the Linux gate's patch-owned lint and translation-pairing failures; `patches/0024` advances the fixed bundle to `dsh-scnet@0.6.9`; `patches/0025` advances it to the published `dsh-scnet@0.6.10` with the protocol-neutral loopback callback listener; `patches/0026` adds a compact, dismissible SCNet status surface to the main window; `patches/0027` refreshes that local status when the window regains focus and removes page listeners on disposal, without adding credentials or network endpoints.
 
-Base: upstream tag **`dsh-v0.2.0-rc.2`** (commit `639ed0153972`), 26 patches.
+Base: upstream tag **`dsh-v0.2.0-rc.2`** (commit `639ed0153972`), 27 patches.
 
 ---
 
@@ -136,7 +136,7 @@ sh "$PATCH_REPO/apply.sh" "$SRC"
 ```
 
 `apply.sh` clones upstream at tag `dsh-v0.2.0-rc.2`, creates branch `linux-desktop`, runs
-`git am` on all 26 patches, and copies `.env.linux.example` to `.env.linux` (the packaging
+`git am` on all 27 patches, and copies `.env.linux.example` to `.env.linux` (the packaging
 code requires that file and aborts without it).
 
 Success conditions — all four must hold:
@@ -317,11 +317,11 @@ Removed, and what each cost:
 
 Verified:
 
-- All 26 patches apply cleanly on `dsh-v0.2.0-rc.2`; after `git am` the worktree is clean with
+- All 27 patches apply cleanly on `dsh-v0.2.0-rc.2`; after `git am` the worktree is clean with
   no leftover changes. (The tree hash moves with the series, so read it with
   `git -C <src> rev-parse HEAD^{tree}` rather than comparing against a value quoted here.)
 - `apply.sh` runs end to end, including under a C locale with no git identity configured:
-  fresh shallow clone → 26 patches → `.env.linux` created → exit 0.
+  fresh shallow clone → 27 patches → `.env.linux` created → exit 0.
 - `check:package` passes and the official Linux build passes runtime preparation, Office
   document round-trip, and Electron packaging.
 - The packaged application starts and serves its local `dsh web` endpoint, with no
@@ -403,7 +403,7 @@ Not verified in this environment:
 ## 10. Layout, license, attribution
 
 ```
-patches/0001..0026*.patch   git format-patch series, applied in file-name order
+patches/0001..0027*.patch   git format-patch series, applied in file-name order
 apply.sh                    clone upstream at the base tag, apply the series, create .env.linux
 verify.sh                   one-shot Linux diagnostic (--env-only / --full); emits a tarball
 LINUX-DESKTOP.md            long-form guide: per-file notes, verified facts, open items
@@ -420,7 +420,8 @@ Each patch is one topic: (1) accept the target, (2) install the `dsh` command,
 cleanup during upgrades, (9) Linux fields in the installer config declarations, (10) let the
 launcher reach the bundled `dsh` payload inside `app.asar`, (11) keep the update environment in
 the upload-plan error, (12) satisfy the upstream repository gates, (13) keep a rebuilt
-window on screen after an activation, and (14) restore the window on a plain second launch.
+window on screen after an activation, (14) restore the window on a plain second launch, and
+(15) refresh the SCNet status when the window regains focus.
 
 This patch set is distributed under the MIT License (see `LICENSE`). The patches are diffs
 against [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness),

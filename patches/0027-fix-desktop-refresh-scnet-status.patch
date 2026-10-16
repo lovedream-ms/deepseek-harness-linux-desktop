@@ -1,0 +1,128 @@
+From a04bbd2d1347f06b61509b0fcdf941057006ed7b Mon Sep 17 00:00:00 2001
+From: linux-port <linux-port@localhost>
+Date: Fri, 16 Oct 2026 11:21:02 +0800
+Subject: [PATCH] fix(desktop): refresh SCNet status on window focus
+
+---
+ apps/desktop/src/preload-scnet-status.ts      | 45 ++++++++++++-------
+ .../tests/preload-scnet-status.spec.ts        | 42 +++++++++++++++++
+ 2 files changed, 71 insertions(+), 16 deletions(-)
+
+diff --git a/apps/desktop/src/preload-scnet-status.ts b/apps/desktop/src/preload-scnet-status.ts
+index 9d62afb..62b92b6 100644
+--- a/apps/desktop/src/preload-scnet-status.ts
++++ b/apps/desktop/src/preload-scnet-status.ts
+@@ -90,23 +90,36 @@ function install(): void {
+     zIndex: '2147483640',
+   })
+   document.body.append(host)
+-  dismiss.addEventListener('click', () => { host.remove() })
+-  action.addEventListener('click', () => { void bridge.openDiagnostics().catch(() => {}) })
+-  void bridge.read().then(({ locale, diagnostics }) => {
+-    const m = locale === 'zh-CN' ? copy['zh-CN'] : copy.en
+-    const state = diagnostics.overall
+-    const status = state === 'ready' ? m.ready
+-      : state === 'needs-setup' ? m.needsSetup
+-        : state === 'disabled' ? m.disabled : m.unavailable
+-    title.textContent = m.title
+-    detail.textContent = `Bundle ${diagnostics.bundle.detail} · ${status}`
+-    dot.dataset.state = state
+-    action.textContent = m.action
+-    action.setAttribute('aria-label', m.action)
+-    dismiss.setAttribute('aria-label', locale === 'zh-CN' ? '关闭' : 'Dismiss')
+-  }).catch(() => {
++  async function refresh(): Promise<void> {
++    try {
++      const { locale, diagnostics } = await bridge.read()
++      const m = locale === 'zh-CN' ? copy['zh-CN'] : copy.en
++      const state = diagnostics.overall
++      const status = state === 'ready' ? m.ready
++        : state === 'needs-setup' ? m.needsSetup
++          : state === 'disabled' ? m.disabled : m.unavailable
++      title.textContent = m.title
++      detail.textContent = `Bundle ${diagnostics.bundle.detail} · ${status}`
++      dot.dataset.state = state
++      action.textContent = m.action
++      action.setAttribute('aria-label', m.action)
++      dismiss.setAttribute('aria-label', locale === 'zh-CN' ? '关闭' : 'Dismiss')
++    } catch {
++      dispose()
++    }
++  }
++  function onFocus(): void { void refresh() }
++  function onPageHide(): void { dispose() }
++  function dispose(): void {
++    window.removeEventListener('focus', onFocus)
++    window.removeEventListener('pagehide', onPageHide)
+     host.remove()
+-  })
++  }
++  dismiss.addEventListener('click', dispose)
++  action.addEventListener('click', () => { void bridge.openDiagnostics().catch(() => {}) })
++  window.addEventListener('focus', onFocus)
++  window.addEventListener('pagehide', onPageHide, { once: true })
++  void refresh()
+ }
+ 
+ export function installScnetStatusSurface(): void {
+diff --git a/apps/desktop/tests/preload-scnet-status.spec.ts b/apps/desktop/tests/preload-scnet-status.spec.ts
+index c1ae172..49114f1 100644
+--- a/apps/desktop/tests/preload-scnet-status.spec.ts
++++ b/apps/desktop/tests/preload-scnet-status.spec.ts
+@@ -8,6 +8,7 @@ describe('SCNet main-window status surface', () => {
+   beforeEach(() => {
+     vi.resetModules()
+     invoke.mockReset()
++    window.dispatchEvent(new Event('pagehide'))
+     document.body.innerHTML = ''
+     Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' })
+   })
+@@ -58,4 +59,45 @@ describe('SCNet main-window status surface', () => {
+     shadow.querySelector('.dismiss')?.dispatchEvent(new MouseEvent('click'))
+     expect(document.querySelector('[data-dsh-scnet-status]')).toBeNull()
+   })
++
++  it('refreshes local state when the main window regains focus', async () => {
++    const snapshots = [
++      { locale: 'en', overall: 'needs-setup', status: 'Authorization required' },
++      { locale: 'en', overall: 'ready', status: 'Ready' },
++    ] as const
++    invoke
++      .mockResolvedValueOnce({
++        locale: snapshots[0].locale,
++        diagnostics: {
++          overall: snapshots[0].overall,
++          bundle: { state: 'ready', detail: '0.6.10' },
++          python: { state: 'ready', detail: 'Python 3.12' },
++          credentials: { state: 'needs-setup', detail: 'Secret Service' },
++          backend: { state: 'ready', detail: 'openapi' },
++          authentication: { state: 'needs-setup', detail: 'authorization required' },
++        },
++      })
++      .mockResolvedValueOnce({
++        locale: snapshots[1].locale,
++        diagnostics: {
++          overall: snapshots[1].overall,
++          bundle: { state: 'ready', detail: '0.6.10' },
++          python: { state: 'ready', detail: 'Python 3.12' },
++          credentials: { state: 'ready', detail: 'configured' },
++          backend: { state: 'ready', detail: 'openapi' },
++          authentication: { state: 'needs-setup', detail: 'authorization required' },
++        },
++      })
++    const { installScnetStatusSurface } = await import('../src/preload-scnet-status.ts')
++    installScnetStatusSurface()
++    const host = await vi.waitFor(() => {
++      const value = document.querySelector('[data-dsh-scnet-status]')
++      if (value === null) throw new Error('surface not mounted')
++      return value
++    })
++    await vi.waitFor(() => { expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('Authorization required') })
++    window.dispatchEvent(new Event('focus'))
++    await vi.waitFor(() => { expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('Ready') })
++    expect(invoke).toHaveBeenCalledTimes(2)
++  })
+ })
+-- 
+2.43.0
+
