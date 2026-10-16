@@ -11,9 +11,13 @@
 4. README.md 与 README.zh.md
 
 当前仓库：
-- 路径：/home/kylinlu/Downloads/agent/plugins/deepseek-harness-linux-desktop
-- 分支：main
-- 最新提交和 origin/main 必须实时查询。开始工作前先执行 `git status --short --branch`，
+- 路径：以当前工作区为准，先执行 `git rev-parse --show-toplevel`；不要假设固定路径。
+- 分支：先执行 `git status --short --branch`、`git branch -vv` 和
+  `git rev-parse HEAD origin/main`。当前交接基线为 `HEAD == origin/main == f9f079d`；
+  本工作区可能显示为 detached `HEAD`，不要把 detached 状态误判为代码不同步。
+- 最新提交和 origin/main 必须实时查询。开始工作前先执行
+  `git status --short --branch`、`git log -6 --oneline` 和
+  `gh run list --repo lql341/deepseek-harness-linux-desktop --limit 8`，
   不要把本文档的描述当作实时状态。
 
 项目边界：
@@ -51,13 +55,19 @@
 - Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
-- `b8dc519 build(desktop): ship the SCNet loopback listener`
-  新增 `0025`，将 Desktop 固定 Bundle 更新为从 canonical 源头发布的 `dsh-scnet@0.6.10`，
-  并把 loopback listener 纳入发行审计。
-- `feca32e fix(ci): expect the updated SCNet bundle version`
-  更新 CI 对 Bundle 版本的明确期望。
-- `99f509d build(ci): advance the preinstalled SCNet bundle to 0.6.9`
-  历史中间版本；已由 `0025` 和正式源头版本 `0.6.10` 取代。
+- `f9f079d feat(desktop): add offline SCNet auth callback skeleton`
+  新增 `0029`，提供严格的 `dsh://auth/scnet` 离线回调解析、一次性 state 消费和
+  Linux 第二次启动参数转发；不执行 token exchange，也不访问真实网络。
+- `611f3ef feat(desktop): add Linux Secret Service adapter`
+  增加 Linux Secret Service 离线适配器与读写/清理测试。
+- `4f3dc30 fix(desktop): refresh SCNet status on window focus`
+  在主窗口重新获得焦点时刷新本地状态，并清理监听器。
+- `e9c7294 feat(desktop): surface SCNet status in the main window`
+  在主窗口加入可关闭的本地 SCNet 状态入口。
+- `ab93d96 feat(mobile): add offline Android and HarmonyOS scaffolds`
+  保留 Android/HarmonyOS 离线骨架，不接入真实认证或服务端请求。
+- `221e8cd docs: record the public SCNet desktop release`
+  记录公开 `.6` 发布证据。
 - `2cb3a31 fix(ci): keep Debian upgrade packages distinct`
   固定 Debian Docker context 中 base/candidate deb 的不同文件名，避免同名产物覆盖导致
   “升级”实际重装旧包。
@@ -69,13 +79,14 @@
   通过 workflow artifact 导出 draft release 资产，供只读 token 验证。
 
 CI 状态（截至本文档）：
-- Desktop push Run `38708184304`（sha `b8dc519`）：success，覆盖补丁回放、typecheck、
-  deb 构建、`dsh-scnet@0.6.10` Bundle 审计、安装和会话。
-- `.6` 完整 release-preflight Run `38709921855`：success；上游 Linux gate、Landlock、
-  bwrap、keyless smoke、包会话和 Debian 13 多发行版验收均通过。
-- 公开 `.6` 发布 Run `38729878217`：success。
-- 公开 `.6` 发布字节验证 Run `38731899365`：success，覆盖 checksum、安装、基础会话、
-  `dsh://`、`.4 → .6`、AppArmor 和 Wayland。
+- 最新 Desktop push Run `38864664188`（sha `f9f079d`）：success，覆盖 29 个补丁回放、
+  TypeScript、Desktop build、deb 构建、安装和基础会话。
+- 前序 Desktop push Run `38858225341`（sha `611f3ef`）：success，覆盖 Linux Secret
+  Service 适配器及其离线测试。
+- `.6` 发布前置和发布验证仍以历史成功 Run 为证据：完整 release-preflight
+  `38709921855`、公开发布 `38729878217`、公开发布字节验证 `38731899365`。
+- `0029` 的本地定向回调、Secret Service 和诊断测试共 `20/20` 通过；干净上游
+  `dsh-v0.2.0-rc.2` 完整回放 tree 为 `2ce6c5b35771ecde79232fa8e558377e398e6eb9`。
 - Push 基础验证 Run `38525938104`（sha `d8f1640`）：success。
 - 完整 release-preflight Run `38506728139`：success。上游 Linux gate 明确只容忍 3 个已知
   coverage 竞态；Landlock、bwrap、keyless smoke、Wayland、AppArmor、候选升级和包会话均通过。
@@ -90,6 +101,8 @@ CI 状态（截至本文档）：
 - 最新公开 release 为 `v0.2.0-rc.2-linux.6`（2026-10-15），包含源头发布并同步的
   `dsh-scnet@0.6.10`；deb SHA-256 为
   `25b349f515d3fe9195dfb341dda09bebbe4db7e4f6c37c0b2304d0fd93be5837`。
+- 当前没有 `.7`；除非用户明确要求且完整 release-preflight 重新通过，否则不要创建或发布新
+  Desktop release。
 - `.1` ~ `.4` 都早于 SCNet 预置补丁系列，验证它们必须用
   `released-profile-expectation=legacy`。
 - `v0.2.0-rc.2-linux.5` 已创建但保持 draft；deb SHA-256 为
@@ -100,8 +113,9 @@ CI 状态（截至本文档）：
 
 推荐下一步（按顺序）：
 1. 保持 draft `.5` 不变；不要复用或公开其旧 Bundle 资产。
-2. 等待 SCNet 正式 OAuth2/API 合同、issuer、scope、测试账户和凭证；在此之前不接入真实登录或 OpenAPI。
-3. 后续所有 `scnet-hpc` / `dsh-scnet` 版本继续从 canonical 源头发布，并同步
+2. 保留正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证的空位；在合同和凭证
+   未提供前，不接入真实登录、刷新、撤销、账户关联或 OpenAPI。
+3. 不接入 upstream alpha。后续所有 `scnet-hpc` / `dsh-scnet` 版本继续从 canonical 源头发布，并同步
    `dsh-scnet`、`codex-scnet-hpc` 和 Desktop 固定 Bundle。
 4. 每次接手仍先查询工作树、最近提交和最新 CI，不把本文历史 Run 号当作实时证据。
 
@@ -112,6 +126,8 @@ CI 状态（截至本文档）：
 - 公开 `.6` 的 deb checksum、安装、升级、`dsh://`、AppArmor、Wayland、基础会话均有证据；
   Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 和 `38709921855` 证据。
 - 没有凭证、私有 endpoint 或未发布合同被写入仓库。
+- 交接时应确认工作树干净，且 `HEAD` 与 `origin/main` 指向同一提交；若处于 detached
+  `HEAD`，只要两者一致即可继续，不要擅自重写分支或历史。
 ```
 
 ## 使用规则
