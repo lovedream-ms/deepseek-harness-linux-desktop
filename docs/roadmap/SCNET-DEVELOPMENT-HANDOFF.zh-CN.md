@@ -10,8 +10,8 @@
 ### 当前仓库状态
 
 - 当前仓库：`deepseek-harness-linux-desktop`
-- 当前提交：`a5472f7 test(desktop): mock SCNet status preload in directory picker test`
-- `HEAD == origin/main == a5472f7`
+- 当前提交：`72e55b0 docs: refresh SCNet development handoff`
+- `HEAD == origin/main == 72e55b0`
 - 工作树干净；当前显示为 detached `HEAD`，不代表与 `origin/main` 不同步。
 - 当前补丁序列为 **30 个补丁**，基线仍为上游 tag `dsh-v0.2.0-rc.2`。
 - 新增的 `0030` 仅修复测试隔离：目录选择器 preload 集成测试现在 mock 与其无关的
@@ -128,7 +128,7 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / `a5472f7` | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架，`0030` 修复目录选择器测试隔离；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| `deepseek-harness-linux-desktop` | `main` / `72e55b0`（代码验证提交为 `a5472f7`） | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架，`0030` 修复目录选择器测试隔离；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
 | 上游临时验证树 | commit `c048ea2`，tree `5bac441359860fe6ecaa96dd765b9ea42c0fe0ea` | 补丁 `0018`–`0030` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
