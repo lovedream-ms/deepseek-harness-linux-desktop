@@ -1,9 +1,57 @@
 # SCNet 开发交接与后续 TODO
 
-- 交接日期：2026-10-15
+- 交接日期：2026-10-16
 - 当前状态：`in progress`
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
+
+## 0.1 2026-10-16 最新交接快照
+
+### 当前仓库状态
+
+- 当前仓库：`deepseek-harness-linux-desktop`
+- 当前提交：`a5472f7 test(desktop): mock SCNet status preload in directory picker test`
+- `HEAD == origin/main == a5472f7`
+- 工作树干净；当前显示为 detached `HEAD`，不代表与 `origin/main` 不同步。
+- 当前补丁序列为 **30 个补丁**，基线仍为上游 tag `dsh-v0.2.0-rc.2`。
+- 新增的 `0030` 仅修复测试隔离：目录选择器 preload 集成测试现在 mock 与其无关的
+  `preload-scnet-status`，避免把 `dsh-desktop:scnet-status` IPC 调用计入目录选择断言。
+
+### 最新 CI 证据
+
+- Push 基础验证 Run `38883088897`（`a5472f7`）：**success**。
+  - 30 个补丁完整回放
+  - repository typecheck
+  - Desktop build
+  - deb 构建、安装和桌面会话
+- 完整 release-preflight Run `38884586418`（`a5472f7`）：截至交接时仍为
+  **in progress**。
+  - 已通过：公开 `.6` checksum、安装和桌面会话；`.4 → 当前候选` 升级；
+    AppArmor hardened launch；Wayland；Debian 13 离线安装/升级/卸载；
+    default、disabled、custom profile 迁移；当前候选构建和基础会话。
+  - 仍在运行：upstream Linux primary gate，以及其后的 sandbox confinement 和
+    keyless agent smoke。
+- 前一次失败的完整 preflight Run `38871785715` 已归因：
+  - `test:coverage` 中的两个 `welcome-startup` 失败属于 workflow 已声明的上游已知
+    coverage 竞态；
+  - 目录选择器的两个失败是 `0026` 新增主窗口 SCNet 状态 preload 后，测试没有 mock
+    该无关 installer，导致多出一次 `dsh-desktop:scnet-status` IPC 调用；
+  - web browser snapshot 的 steering replay 失败未在本地复现，属于独立的上游 web
+    replay/session 环境问题；本地干净树缺少 web dist，构建还被上游缺失的
+    `@deepseek-ai/dsh-experimental-webworker-runtime/worker` 依赖阻塞。
+- 因 `38884586418` 尚未完成，**当前仍不得创建或发布 `.7` release**。
+
+### 当前交接动作
+
+1. 等待 Run `38884586418` 完成，并检查 `linux-gates.log`；只有 upstream gate、
+   web snapshot、sandbox 和 keyless 全部有明确结果，才能形成新的 release-preflight
+   证据。
+2. 若该 run 只剩 workflow 已声明的 3 个 coverage 竞态，记录其精确失败列表并确认
+   workflow 的容忍条件确实只匹配这 3 项；不要扩大容忍规则。
+3. 若完整 preflight 成功，再由用户明确决定是否触发
+   `.github/workflows/publish-linux-desktop.yml` 创建 draft `.7`；不要自动发布。
+4. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
+   登录、刷新、撤销、账户关联和 OpenAPI 查询为阻塞项。
 
 ## 0. 当前总体进度
 
@@ -21,11 +69,12 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 29 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
+- [x] 30 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback callback listener 的 `0.6.10`，
   `0027` 增加主窗口焦点恢复时的本地状态刷新和监听器清理，`0028` 增加 Linux Secret Service
   适配器与离线读写/清理测试，`0029` 增加严格的离线 `dsh://auth/scnet` 回调解析、一次性
-  state 路由和 Linux 第二次启动参数转发
+  state 路由和 Linux 第二次启动参数转发，`0030` 修复目录选择器 preload 集成测试的
+  SCNet 状态 mock 隔离
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] `dsh-scnet@0.6.10` connector 测试 `26/26` 和 package validate 通过；npm 包为 55 个文件、
   MIT 许可证，未引入凭证或 endpoint
@@ -79,8 +128,8 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `edf50e6` / 待生成 29 补丁回放 tree | 补丁 `0018`–`0029` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
+| `deepseek-harness-linux-desktop` | `main` / `a5472f7` | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架，`0030` 修复目录选择器测试隔离；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | commit `c048ea2`，tree `5bac441359860fe6ecaa96dd765b9ea42c0fe0ea` | 补丁 `0018`–`0030` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
 
@@ -159,7 +208,8 @@ git diff --check
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
 - `0029` 新增回调协议测试 `8/8`、single-instance 测试 `2/2`，并通过 Desktop TypeScript、
   oxlint 和 host build；未执行真实网络请求。
-- 29 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree 将在提交后由 CI 重新记录；相关
+- 30 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，回放末提交为 `c048ea2`，tree 为
+  `5bac441359860fe6ecaa96dd765b9ea42c0fe0ea`；相关
   Desktop 回调与启动测试通过，TypeScript
   检查和新增文件 oxlint 通过。全仓 `lint:contracts-ready` 仍被上游既有的大量
   `no-unsafe-*` 错误阻塞，未归因于 `0026`。
