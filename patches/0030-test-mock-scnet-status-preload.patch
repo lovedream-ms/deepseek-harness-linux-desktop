@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: linux-port <linux-port@localhost>
+Date: Fri, 16 Oct 2026 17:45:00 +0800
+Subject: [PATCH] test(desktop): mock SCNet status preload in directory picker test
+
+The preload app now installs the local SCNet status surface on the main
+window. Keep the directory-picker preload integration test focused on its
+own IPC bridge by mocking that unrelated installer.
+
+---
+ .../tests/client-flow.client.spec.tsx                         | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/packages/client/ui-directory-picker-native/tests/client-flow.client.spec.tsx b/packages/client/ui-directory-picker-native/tests/client-flow.client.spec.tsx
+index 0000000..0000000 100644
+--- a/packages/client/ui-directory-picker-native/tests/client-flow.client.spec.tsx
++++ b/packages/client/ui-directory-picker-native/tests/client-flow.client.spec.tsx
+@@ -15,6 +15,7 @@ vi.mock(desktopIpc.electron, () => ({
+ vi.mock('../../../../apps/desktop/src/preload-platform.ts', () => ({ markDocumentPlatform: vi.fn(), syncWindowFullscreen: vi.fn() }))
+ vi.mock('../../../../apps/desktop/src/preload-theme.ts', () => ({ syncNativeTheme: vi.fn() }))
+ vi.mock('../../../../apps/desktop/src/preload-windows.ts', () => ({ syncWindowsAppearance: vi.fn() }))
+ vi.mock('../../../../apps/desktop/src/preload-mandatory-overlay.ts', () => ({ installMandatoryUpdateOverlay: vi.fn() }))
++vi.mock('../../../../apps/desktop/src/preload-scnet-status.ts', () => ({ installScnetStatusSurface: vi.fn() }))
+ 
+ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); desktopIpc.invoke.mockReset(); desktopIpc.on.mockReset() })
+ 
