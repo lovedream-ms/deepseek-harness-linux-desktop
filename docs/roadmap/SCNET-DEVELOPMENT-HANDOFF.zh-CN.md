@@ -21,10 +21,11 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 28 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
+- [x] 29 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback callback listener 的 `0.6.10`，
   `0027` 增加主窗口焦点恢复时的本地状态刷新和监听器清理，`0028` 增加 Linux Secret Service
-  适配器与离线读写/清理测试
+  适配器与离线读写/清理测试，`0029` 增加严格的离线 `dsh://auth/scnet` 回调解析、一次性
+  state 路由和 Linux 第二次启动参数转发
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] `dsh-scnet@0.6.10` connector 测试 `26/26` 和 package validate 通过；npm 包为 55 个文件、
   MIT 许可证，未引入凭证或 endpoint
@@ -58,7 +59,7 @@
 
 - [x] 本地状态和诊断展示
 - [x] Linux Secret Service 适配器接口与离线测试；实际 Desktop 登录接线、锁屏和无桌面会话验收仍待完成
-- [ ] `dsh://auth/scnet` 回调
+- [x] `dsh://auth/scnet` 离线回调解析、state 一次性消费和第二次启动参数转发骨架
 - [x] loopback 回调协议层监听器
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
 - [ ] 凭据清理、锁屏和无桌面会话测试
@@ -78,8 +79,8 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `4a610bb` / tree `118e1179bc6fee89a959190b98f54323f3f2f696` | 补丁 `0018`–`0028` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `edf50e6` / 待生成 29 补丁回放 tree | 补丁 `0018`–`0029` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
 
@@ -111,6 +112,9 @@
 - 主窗口重新获得焦点时会重新读取本地 SCNet 状态；页面销毁时移除 focus/pagehide 监听器。
 - Linux Secret Service 适配器通过固定 `application=dsh-scnet`、`profile=default` 属性执行
   `secret-tool lookup/store/clear`；值只通过 stdin 传递，适配器错误不包含密文。
+- `dsh://auth/scnet` 只在本地解析固定 scheme/host/path，要求非空 `state` 且只允许 `code` 或
+  OAuth 错误结果之一；已注册 state 在 handler 执行前一次性消费，重复回调和未知 state 被拒绝。
+  Linux 第二次启动会转发命令行中的深链给同一回调边界，但不会交换 token 或发起网络请求。
 - 诊断窗口通过隔离 preload 和来源校验提供状态，不向 renderer 暴露 token、AK/SK 或服务端免登凭证；在未收到正式合同/凭证时，认证状态保持“需要授权”。
 
 ## 3. 验证证据
@@ -153,8 +157,10 @@ git diff --check
 - 定向 Desktop 测试 `170/170` 通过；新增测试覆盖 profile 禁用、Python 缺失、本地 metadata、
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
-- 28 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree
-  `118e1179bc6fee89a959190b98f54323f3f2f696`；相关 Desktop 测试 `13/13`、TypeScript
+- `0029` 新增回调协议测试 `8/8`、single-instance 测试 `2/2`，并通过 Desktop TypeScript、
+  oxlint 和 host build；未执行真实网络请求。
+- 29 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree 将在提交后由 CI 重新记录；相关
+  Desktop 回调与启动测试通过，TypeScript
   检查和新增文件 oxlint 通过。全仓 `lint:contracts-ready` 仍被上游既有的大量
   `no-unsafe-*` 错误阻塞，未归因于 `0026`。
 - `0022` 的 Desktop 定向打包测试通过，并在生成 deb 的 control 字段中确认包含 `libasound2`。
@@ -292,7 +298,8 @@ gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行
 ### P1：完成 Linux Desktop 登录链路
 
 - [ ] 接入 Linux Secret Service/Keyring，并验证锁屏、无 keyring、无桌面会话和凭据清理场景。
-- [ ] 实现 `dsh://auth/scnet` 深链回调及 `127.0.0.1` loopback 回退。
+- [x] 实现 `dsh://auth/scnet` 离线解析、state 一次性消费和第二次启动参数转发；
+  真实 OAuth2 回调接线及 `127.0.0.1` loopback 回退仍待正式合同。
 - [ ] 将 connector 状态和 login/refresh/logout/link/unlink 接入 Desktop UI 与 IPC。
 - [x] 增加首个用户可见的 SCNet 本地诊断页，区分 Bundle、Python、backend、凭据和认证状态；
   真实登录按钮仍等待 M0 合同和凭证。

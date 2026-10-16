@@ -32,10 +32,11 @@
 - 不要只修改 dsh-scnet，也不要把本仓库补丁当成 dsh-scnet 的源头。
 - Desktop 上游修改必须通过新的 `patches/NNNN-*.patch` 表达，不能只改临时 upstream checkout。
 - 基线是上游 tag `dsh-v0.2.0-rc.2`。
-- 当前补丁序列为 28 个，`0023` 已修复补丁自身触发的 Linux lint 和 README 翻译配对失败，
+- 当前补丁序列为 29 个，`0023` 已修复补丁自身触发的 Linux lint 和 README 翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback listener 的
   `dsh-scnet@0.6.10`，`0027` 在主窗口重新获得焦点时刷新本地状态并清理监听器，
-  `0028` 增加 Linux Secret Service 适配器与离线测试。
+  `0028` 增加 Linux Secret Service 适配器与离线测试，`0029` 增加离线
+  `dsh://auth/scnet` 回调解析和一次性 state 路由。
 - 生成或修改补丁后，必须在干净上游树运行 `./apply.sh` 或等价的完整 `git am` 回放验证。
 - CI 改动改的是 `.github/workflows/*` 与 `ci/*`；只有这几类路径才会触发 push 基础验证。
 
@@ -45,6 +46,8 @@
 - 本地只读 SCNet 诊断页已加入 Desktop 菜单；主窗口也显示可关闭的 SCNet 状态入口，且窗口重新获得焦点时刷新本地状态。Linux Secret Service 适配器已具备离线读写/清理接口。两者只读 Bundle、Python、backend、凭据和认证状态，
   不发起网络请求，不暴露凭据。
 - OAuth2 + PKCE 和 loopback callback listener 是离线协议骨架，不代表真实 SCNet 登录已完成。
+- `dsh://auth/scnet` 当前只做本地协议解析、一次性 state 消费和第二次启动参数转发，不执行 token
+  交换或任何真实网络请求。
 - Ubuntu 24.04 基础 deb、首次启动、`dsh://` 激活、卸载和候选升级路径已通过；Debian 13 基础离线验收和候选升级路径均已通过。
 
 最近提交（最新在上）：
@@ -104,7 +107,7 @@ CI 状态（截至本文档）：
 
 完成标准：
 - 工作树干净，origin/main 已同步。
-- 28 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
+- 29 个补丁可在基线 tag `dsh-v0.2.0-rc.2` 上按顺序完整应用。
 - 定向测试和对应 CI 门禁有明确证据，release-preflight 没有未归因失败。
 - 公开 `.6` 的 deb checksum、安装、升级、`dsh://`、AppArmor、Wayland、基础会话均有证据；
   Debian 13 候选升级三种 profile 合同也有 Run `38660453246` 和 `38709921855` 证据。

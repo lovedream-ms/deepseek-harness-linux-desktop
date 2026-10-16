@@ -1,0 +1,348 @@
+From edf50e6eaf5fec660b0f53cbb72ece55cd40e9bb Mon Sep 17 00:00:00 2001
+From: linux-port <linux-port@localhost>
+Date: Fri, 16 Oct 2026 14:46:26 +0800
+Subject: [PATCH] feat(desktop): add offline SCNet auth callback deep link
+
+---
+ apps/desktop/src/main.ts                      |  20 ++-
+ apps/desktop/src/scnet-auth-callback.ts       | 155 ++++++++++++++++++
+ apps/desktop/src/single-instance.ts           |   8 +-
+ .../desktop/tests/scnet-auth-callback.spec.ts |  62 +++++++
+ apps/desktop/tests/single-instance.spec.ts    |   4 +-
+ 5 files changed, 244 insertions(+), 5 deletions(-)
+ create mode 100644 apps/desktop/src/scnet-auth-callback.ts
+ create mode 100644 apps/desktop/tests/scnet-auth-callback.spec.ts
+
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 45012e9..3612de9 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -61,10 +61,12 @@ import { DesktopTray } from './tray.ts'
+ import { DesktopBackgroundNotice } from './background-notice.ts'
+ import { openScnetDiagnosticsWindow } from './scnet-diagnostics-window.ts'
+ import { readScnetDiagnostics } from './scnet-diagnostics.ts'
++import { createScnetAuthCallbackRouter } from './scnet-auth-callback.ts'
+ 
+ let focusPrimaryWindow = (): void => {}
+ let stopForRecovery = async (): Promise<void> => {}
+ let shuttingDown = false
++const scnetAuthCallbacks = createScnetAuthCallbackRouter()
+ /**
+  * Set by quit entries that must not ask: crash recovery exit and restart, and the
+  * development restart command. The installer handoff has its own before-quit branch.
+@@ -131,6 +133,13 @@ function reportFatal(error: unknown, source: CrashReportSource): void {
+   void recovery.report(error, source).catch((failure: unknown) => { console.error(failure); app.exit(1) })
+ }
+ 
++function routeScnetAuthCallback(url: string): void {
++  const result = scnetAuthCallbacks.route(url)
++  if (result.status === 'rejected') {
++    console.warn('desktop SCNet auth callback rejected:', result.code)
++  }
++}
++
+ protocol.registerSchemesAsPrivileged([{
+   scheme: SCHEME,
+   privileges: {
+@@ -1288,7 +1297,11 @@ async function main(): Promise<void> {
+   if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+   app.on('open-url', (event, url) => {
+     event.preventDefault()
+-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
++    if (url === 'dsh://open' || url === 'dsh://open/') {
++      focusPrimaryWindow()
++      return
++    }
++    routeScnetAuthCallback(url)
+   })
+ 
+   app.on('activate', (_event, hasVisibleWindows) => {
+@@ -1404,7 +1417,10 @@ async function main(): Promise<void> {
+   publishUpdate(updateState)
+ }
+ 
+-const ownsDesktopInstance = claimDesktopSingleInstance(app, () => { focusPrimaryWindow() })
++const ownsDesktopInstance = claimDesktopSingleInstance(app, () => { focusPrimaryWindow() }, (commandLine) => {
++  const callback = commandLine.find(argument => argument.startsWith('dsh://auth/scnet'))
++  if (callback !== undefined) routeScnetAuthCallback(callback)
++})
+ 
+ if (ownsDesktopInstance) void app.whenReady().then(main).catch(async (error: unknown) => {
+   const message = error instanceof Error ? error.message : String(error)
+diff --git a/apps/desktop/src/scnet-auth-callback.ts b/apps/desktop/src/scnet-auth-callback.ts
+new file mode 100644
+index 0000000..76dc212
+--- /dev/null
++++ b/apps/desktop/src/scnet-auth-callback.ts
+@@ -0,0 +1,155 @@
++const SCNET_AUTH_SCHEME = 'dsh:'
++const SCNET_AUTH_HOST = 'auth'
++const SCNET_AUTH_PATH = '/scnet'
++const MAX_STATE_LENGTH = 512
++const MAX_CODE_LENGTH = 4096
++const MAX_ERROR_LENGTH = 128
++const MAX_DESCRIPTION_LENGTH = 1024
++const MAX_URI_LENGTH = 2048
++
++const ALLOWED_PARAMETERS = new Set(['code', 'error', 'error_description', 'error_uri', 'iss', 'state'])
++
++export type ScnetAuthCallback =
++  | {
++    readonly kind: 'success'
++    readonly code: string
++    readonly state: string
++    readonly issuer?: string
++  }
++  | {
++    readonly kind: 'error'
++    readonly error: string
++    readonly state: string
++    readonly description?: string
++    readonly errorUri?: string
++    readonly issuer?: string
++  }
++
++export type ScnetAuthCallbackParseErrorCode =
++  | 'invalid-url'
++  | 'invalid-target'
++  | 'invalid-parameters'
++  | 'missing-state'
++  | 'invalid-result'
++
++export class ScnetAuthCallbackParseError extends Error {
++  readonly code: ScnetAuthCallbackParseErrorCode
++
++  constructor(code: ScnetAuthCallbackParseErrorCode) {
++    super(`SCNet auth callback rejected (${code})`)
++    this.name = 'ScnetAuthCallbackParseError'
++    this.code = code
++  }
++}
++
++function parameterValue(parameters: URLSearchParams, name: string, maxLength: number): string | undefined {
++  const values = parameters.getAll(name)
++  if (values.length > 1) throw new ScnetAuthCallbackParseError('invalid-parameters')
++  const value = values[0]
++  if (value === undefined) return undefined
++  if (value.length === 0 || value.length > maxLength || /[\u0000-\u001f\u007f]/u.test(value)) {
++    throw new ScnetAuthCallbackParseError('invalid-parameters')
++  }
++  return value
++}
++
++function optionalParameter(parameters: URLSearchParams, name: string, maxLength: number): string | undefined {
++  return parameterValue(parameters, name, maxLength)
++}
++
++/**
++ * Parse only the local OAuth callback shape. This function does not validate an issuer,
++ * exchange a code, or contact a network endpoint.
++ */
++export function parseScnetAuthCallbackUrl(rawUrl: string): ScnetAuthCallback {
++  let url: URL
++  try {
++    url = new URL(rawUrl)
++  } catch {
++    throw new ScnetAuthCallbackParseError('invalid-url')
++  }
++  if (url.protocol !== SCNET_AUTH_SCHEME || url.hostname !== SCNET_AUTH_HOST
++    || url.pathname !== SCNET_AUTH_PATH || url.port !== '' || url.username !== '' || url.password !== ''
++    || url.hash !== '') {
++    throw new ScnetAuthCallbackParseError('invalid-target')
++  }
++  for (const key of url.searchParams.keys()) {
++    if (!ALLOWED_PARAMETERS.has(key)) throw new ScnetAuthCallbackParseError('invalid-parameters')
++  }
++  const state = parameterValue(url.searchParams, 'state', MAX_STATE_LENGTH)
++  if (state === undefined) throw new ScnetAuthCallbackParseError('missing-state')
++  const code = optionalParameter(url.searchParams, 'code', MAX_CODE_LENGTH)
++  const error = optionalParameter(url.searchParams, 'error', MAX_ERROR_LENGTH)
++  const description = optionalParameter(url.searchParams, 'error_description', MAX_DESCRIPTION_LENGTH)
++  const errorUri = optionalParameter(url.searchParams, 'error_uri', MAX_URI_LENGTH)
++  const issuer = optionalParameter(url.searchParams, 'iss', MAX_URI_LENGTH)
++  if ((code === undefined) === (error === undefined)) {
++    throw new ScnetAuthCallbackParseError('invalid-result')
++  }
++  if (code !== undefined) {
++    if (description !== undefined || errorUri !== undefined) throw new ScnetAuthCallbackParseError('invalid-result')
++    return issuer === undefined ? { kind: 'success', code, state } : { kind: 'success', code, state, issuer }
++  }
++  if (error === undefined) throw new ScnetAuthCallbackParseError('invalid-result')
++  return {
++    kind: 'error',
++    error,
++    state,
++    ...(description === undefined ? {} : { description }),
++    ...(errorUri === undefined ? {} : { errorUri }),
++    ...(issuer === undefined ? {} : { issuer }),
++  }
++}
++
++export type ScnetAuthCallbackRoute =
++  | { readonly status: 'ignored' }
++  | { readonly status: 'rejected'; readonly code: ScnetAuthCallbackParseErrorCode }
++  | { readonly status: 'unknown-state' }
++  | { readonly status: 'replayed' }
++  | { readonly status: 'accepted'; readonly callback: ScnetAuthCallback }
++
++export interface ScnetAuthCallbackRouter {
++  register(state: string, handler: (callback: ScnetAuthCallback) => void | Promise<void>): () => void
++  route(rawUrl: string): ScnetAuthCallbackRoute
++}
++
++/**
++ * In-memory callback boundary for the Desktop shell. A state is removed before the
++ * handler runs, so a second delivery cannot invoke the handler again.
++ */
++export function createScnetAuthCallbackRouter(): ScnetAuthCallbackRouter {
++  const pending = new Map<string, (callback: ScnetAuthCallback) => void | Promise<void>>()
++  const consumed = new Set<string>()
++
++  return {
++    register(state, handler) {
++      if (state.length === 0 || state.length > MAX_STATE_LENGTH || /[\u0000-\u001f\u007f]/u.test(state)) {
++        throw new ScnetAuthCallbackParseError('missing-state')
++      }
++      if (pending.has(state)) throw new ScnetAuthCallbackParseError('invalid-parameters')
++      pending.set(state, handler)
++      return () => {
++        if (pending.get(state) === handler) pending.delete(state)
++      }
++    },
++    route(rawUrl) {
++      let callback: ScnetAuthCallback
++      try {
++        callback = parseScnetAuthCallbackUrl(rawUrl)
++      } catch (error) {
++        if (error instanceof ScnetAuthCallbackParseError) {
++          if (error.code === 'invalid-target') return { status: 'ignored' }
++          return { status: 'rejected', code: error.code }
++        }
++        return { status: 'rejected', code: 'invalid-url' }
++      }
++      if (consumed.has(callback.state)) return { status: 'replayed' }
++      const handler = pending.get(callback.state)
++      if (handler === undefined) return { status: 'unknown-state' }
++      pending.delete(callback.state)
++      consumed.add(callback.state)
++      void Promise.resolve().then(() => handler(callback)).catch(() => undefined)
++      return { status: 'accepted', callback }
++    },
++  }
++}
+diff --git a/apps/desktop/src/single-instance.ts b/apps/desktop/src/single-instance.ts
+index 7911b46..f440147 100644
+--- a/apps/desktop/src/single-instance.ts
++++ b/apps/desktop/src/single-instance.ts
+@@ -4,7 +4,7 @@
+ export interface DesktopSingleInstanceApplication {
+   requestSingleInstanceLock(): boolean
+   quit(): void
+-  on(event: 'second-instance', listener: () => void): unknown
++  on(event: 'second-instance', listener: (event: unknown, commandLine?: readonly string[]) => void): unknown
+ }
+ 
+ /**
+@@ -16,11 +16,15 @@ export interface DesktopSingleInstanceApplication {
+ export function claimDesktopSingleInstance(
+   application: DesktopSingleInstanceApplication,
+   focusOwner: () => void,
++  handleCommandLine: (commandLine: readonly string[]) => void = () => {},
+ ): boolean {
+   if (!application.requestSingleInstanceLock()) {
+     application.quit()
+     return false
+   }
+-  application.on('second-instance', focusOwner)
++  application.on('second-instance', (_event, commandLine) => {
++    handleCommandLine(commandLine ?? [])
++    focusOwner()
++  })
+   return true
+ }
+diff --git a/apps/desktop/tests/scnet-auth-callback.spec.ts b/apps/desktop/tests/scnet-auth-callback.spec.ts
+new file mode 100644
+index 0000000..158e5fb
+--- /dev/null
++++ b/apps/desktop/tests/scnet-auth-callback.spec.ts
+@@ -0,0 +1,62 @@
++import { describe, expect, it, vi } from 'vitest'
++import {
++  createScnetAuthCallbackRouter,
++  parseScnetAuthCallbackUrl,
++  ScnetAuthCallbackParseError,
++} from '../src/scnet-auth-callback.ts'
++
++describe('SCNet auth callback deep link', () => {
++  it('parses a success callback without contacting a server', () => {
++    expect(parseScnetAuthCallbackUrl('dsh://auth/scnet?code=opaque-code&state=opaque-state')).toEqual({
++      kind: 'success',
++      code: 'opaque-code',
++      state: 'opaque-state',
++    })
++  })
++
++  it('parses an OAuth error and keeps optional issuer evidence opaque', () => {
++    expect(parseScnetAuthCallbackUrl(
++      'dsh://auth/scnet?error=access_denied&error_description=cancelled&error_uri=https%3A%2F%2Fexample.invalid%2Fhelp&iss=https%3A%2F%2Fissuer.invalid&state=opaque-state',
++    )).toEqual({
++      kind: 'error',
++      error: 'access_denied',
++      description: 'cancelled',
++      errorUri: 'https://example.invalid/help',
++      issuer: 'https://issuer.invalid',
++      state: 'opaque-state',
++    })
++  })
++
++  it.each([
++    'https://auth/scnet?code=opaque&state=opaque-state',
++    'dsh://wrong/scnet?code=opaque&state=opaque-state',
++    'dsh://auth/other?code=opaque&state=opaque-state',
++    'dsh://auth/scnet?code=opaque&state=opaque-state#fragment',
++    'dsh://auth/scnet?code=opaque&state=opaque-state&state=again',
++    'dsh://auth/scnet?code=opaque&state=opaque-state&unexpected=value',
++    'dsh://auth/scnet?code=opaque',
++    'dsh://auth/scnet?code=opaque&error=access_denied&state=opaque-state',
++  ])('rejects an unsupported callback shape: %s', (url) => {
++    expect(() => parseScnetAuthCallbackUrl(url)).toThrow(ScnetAuthCallbackParseError)
++  })
++
++  it('consumes a registered state once before invoking the handler', async () => {
++    const router = createScnetAuthCallbackRouter()
++    const handler = vi.fn()
++    const unregister = router.register('opaque-state', handler)
++    const url = 'dsh://auth/scnet?code=opaque-code&state=opaque-state'
++    expect(router.route(url)).toMatchObject({ status: 'accepted' })
++    expect(router.route(url)).toEqual({ status: 'replayed' })
++    await Promise.resolve()
++    expect(handler).toHaveBeenCalledOnce()
++    unregister()
++  })
++
++  it('does not consume callbacks for an unknown state', () => {
++    const router = createScnetAuthCallbackRouter()
++    const url = 'dsh://auth/scnet?error=access_denied&state=unknown-state'
++    expect(router.route(url)).toEqual({ status: 'unknown-state' })
++    router.register('unknown-state', vi.fn())
++    expect(router.route(url)).toMatchObject({ status: 'accepted' })
++  })
++})
+diff --git a/apps/desktop/tests/single-instance.spec.ts b/apps/desktop/tests/single-instance.spec.ts
+index 220f0d5..ad55300 100644
+--- a/apps/desktop/tests/single-instance.spec.ts
++++ b/apps/desktop/tests/single-instance.spec.ts
+@@ -22,7 +22,9 @@ describe('desktop single-instance ownership', () => {
+     const application = {
+       requestSingleInstanceLock: () => true,
+       quit: vi.fn(),
+-      on: vi.fn((_event: 'second-instance', listener: () => void) => { secondInstance = listener }),
++      on: vi.fn((_event: 'second-instance', listener: (event: unknown, commandLine?: readonly string[]) => void) => {
++        secondInstance = () => { listener({}, []) }
++      }),
+     } satisfies DesktopSingleInstanceApplication
+ 
+     expect(claimDesktopSingleInstance(application, focus)).toBe(true)
+-- 
+2.43.0
+
