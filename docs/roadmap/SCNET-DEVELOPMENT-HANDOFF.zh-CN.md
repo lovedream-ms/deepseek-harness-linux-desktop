@@ -21,9 +21,10 @@
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
 - [x] 本地 SCNet 连接诊断页
-- [x] 27 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
+- [x] 28 个补丁在全新上游树重放；`0023` 修复上游 Linux 门禁中的补丁自身 lint 与翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback callback listener 的 `0.6.10`，
-  `0027` 增加主窗口焦点恢复时的本地状态刷新和监听器清理
+  `0027` 增加主窗口焦点恢复时的本地状态刷新和监听器清理，`0028` 增加 Linux Secret Service
+  适配器与离线读写/清理测试
 - [x] Desktop 定向测试 `170/170` 和 host build
 - [x] `dsh-scnet@0.6.10` connector 测试 `26/26` 和 package validate 通过；npm 包为 55 个文件、
   MIT 许可证，未引入凭证或 endpoint
@@ -56,7 +57,7 @@
 ### M3：Desktop 登录与安全存储
 
 - [x] 本地状态和诊断展示
-- [ ] Linux Secret Service/Keyring 实际 Desktop 适配
+- [x] Linux Secret Service 适配器接口与离线测试；实际 Desktop 登录接线、锁屏和无桌面会话验收仍待完成
 - [ ] `dsh://auth/scnet` 回调
 - [x] loopback 回调协议层监听器
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
@@ -77,8 +78,8 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
-| 上游临时验证树 | `e1d721e` / tree `ea85e432358f6cd2ac548eb7bc3f3ad3533f53e8` | 补丁 `0018`–`0027` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
+| `deepseek-harness-linux-desktop` | `main` / 本文档所在提交 | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| 上游临时验证树 | `4a610bb` / tree `118e1179bc6fee89a959190b98f54323f3f2f696` | 补丁 `0018`–`0028` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
 
@@ -108,6 +109,8 @@
 - Web profile 仍保持显式安装，不自动加入 `dsh-scnet`。
 - 应用菜单新增“SCNet 连接诊断…”，主窗口右下角也显示可关闭的 SCNet 状态入口；两者显示 Bundle、Python、backend、凭据就绪和认证状态，只读本地信息，不发起网络请求。
 - 主窗口重新获得焦点时会重新读取本地 SCNet 状态；页面销毁时移除 focus/pagehide 监听器。
+- Linux Secret Service 适配器通过固定 `application=dsh-scnet`、`profile=default` 属性执行
+  `secret-tool lookup/store/clear`；值只通过 stdin 传递，适配器错误不包含密文。
 - 诊断窗口通过隔离 preload 和来源校验提供状态，不向 renderer 暴露 token、AK/SK 或服务端免登凭证；在未收到正式合同/凭证时，认证状态保持“需要授权”。
 
 ## 3. 验证证据
@@ -145,11 +148,13 @@ git diff --check
   点击后打开现有本地诊断页；状态读取和打开动作均经过主窗口来源校验。
 - `0027` 在主窗口重新获得焦点时刷新本地状态，并在页面销毁时清理事件监听器；定向测试覆盖
   外部状态变化后的即时刷新。
+- `0028` 新增 Secret Service 适配器和 4 个离线测试；诊断页复用该适配器判断 provider 是否可用，
+  但不会读取或显示凭据。
 - 定向 Desktop 测试 `170/170` 通过；新增测试覆盖 profile 禁用、Python 缺失、本地 metadata、
   IPC 来源校验和凭据脱敏。
 - `pnpm run build:lib:host` 通过，产出 `lib/preload-scnet-diagnostics.cjs` 和诊断页资源。
-- 27 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree
-  `ea85e432358f6cd2ac548eb7bc3f3ad3533f53e8`；Desktop 定向测试 `146/146`、TypeScript
+- 28 个补丁在干净的 `dsh-v0.2.0-rc.2` 树完整回放，tree
+  `118e1179bc6fee89a959190b98f54323f3f2f696`；相关 Desktop 测试 `13/13`、TypeScript
   检查和新增文件 oxlint 通过。全仓 `lint:contracts-ready` 仍被上游既有的大量
   `no-unsafe-*` 错误阻塞，未归因于 `0026`。
 - `0022` 的 Desktop 定向打包测试通过，并在生成 deb 的 control 字段中确认包含 `libasound2`。

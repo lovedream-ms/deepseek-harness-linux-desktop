@@ -23,7 +23,7 @@
 - [x] Python 解释器路径注入和输入校验
 - [x] 本地只读 SCNet 连接诊断页
 - [x] 主窗口 SCNet 状态入口（本地只读、可关闭、可打开诊断页）
-- [x] 27 个补丁在全新上游树应用成功
+- [x] 28 个补丁在全新上游树应用成功
 - [x] Desktop 定向测试 `170/170`，host build 通过
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动、`dsh://` 激活和卸载 CI 验收（Run `38233490072`）
 - [x] Debian 13 同等验收在手动多发行版 Run `38233720311` 通过；不作为日常 push 阻塞
@@ -50,7 +50,7 @@
 ### M3：Linux Desktop 登录链路
 
 - [x] 本地 Bundle/Python/backend/凭据/认证诊断
-- [ ] Linux Secret Service/Keyring 实际适配
+- [x] Linux Secret Service 适配器接口与离线读写/清理测试（真实登录接线仍等待正式合同）
 - [x] loopback callback 协议层已具备
 - [ ] `dsh://auth/scnet` 深链注册和回调接线
 - [ ] login/refresh/logout/link/unlink UI 与 IPC
@@ -279,6 +279,8 @@ profile 自动迁移，并保留显式禁用状态。
 补丁 `0021` 增加应用菜单中的 SCNet 本地连接诊断页，展示 Bundle、Python、backend、凭据
 就绪和认证状态；补丁 `0026` 在主窗口增加可关闭的 SCNet 状态入口，并可打开同一诊断页；
 补丁 `0027` 在窗口重新获得焦点时刷新本地状态，并在页面销毁时清理监听器。
+补丁 `0028` 增加 Linux Secret Service 适配器，固定应用/profile 属性并通过 stdin 传递值；
+适配器只提供本地存储接口，不接入真实登录或 endpoint。
 两者都只读本地文件与运行时，不发起网络请求，也不向 renderer 暴露 token、AK/SK 或服务端
 免登凭证。补丁 `0022` 为 Electron 在干净 Debian/Ubuntu 安装中声明
 `libasound2` 运行时依赖；GitHub Actions Run `38233490072` 已通过 Ubuntu package smoke，
