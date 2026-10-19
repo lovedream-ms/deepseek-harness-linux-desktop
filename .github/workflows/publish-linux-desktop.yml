@@ -95,6 +95,7 @@ jobs:
         env:
           DSH_DESKTOP_TARGET_PLATFORM: linux
           DSH_DESKTOP_TARGET_ARCH: x64
+          DSH_DESKTOP_RELEASE_TAG: ${{ inputs.tag }}
 
       - name: Assemble the assets and their checksums
         # release-verify runs `sha256sum -c SHA256SUMS` inside the download directory, so the
