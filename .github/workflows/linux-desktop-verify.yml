@@ -47,7 +47,7 @@ on:
       release-tag:
         description: Release tag whose published deb the published-artifact jobs verify
         type: string
-        default: v0.2.0-rc.2-linux.3
+        default: v0.2.1-rc.2-linux.1
       release-run-id:
         description: Optional successful publish workflow Run ID whose draft-release-assets artifact is verified
         type: string
@@ -55,11 +55,11 @@ on:
       previous-release-tag:
         description: Release tag the deb upgrade path upgrades from
         type: string
-        default: v0.2.0-rc.2-linux.2
+        default: v0.2.0-rc.2-linux.6
       candidate-base-tag:
         description: Published release tag used as the base for current-candidate upgrade checks
         type: string
-        default: v0.2.0-rc.2-linux.4
+        default: v0.2.1-rc.2-linux.1
       released-profile-expectation:
         description: >-
           Profile bundle state the published deb verified by the release-verify job is expected to
