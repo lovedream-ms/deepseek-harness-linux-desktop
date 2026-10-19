@@ -38,14 +38,15 @@
 - 基线是上游 tag `dsh-v0.2.0-rc.2`。
 - 当前补丁序列为 29 个，`0023` 已修复补丁自身触发的 Linux lint 和 README 翻译配对失败，
   `0024` 更新到 `dsh-scnet@0.6.9`，`0025` 更新到带 loopback listener 的
-  `dsh-scnet@0.6.10`，`0027` 在主窗口重新获得焦点时刷新本地状态并清理监听器，
+  `dsh-scnet@0.6.10`，后续当前 Desktop Bundle 已更新到 `dsh-scnet@0.6.13`；
+  `0027` 在主窗口重新获得焦点时刷新本地状态并清理监听器，
   `0028` 增加 Linux Secret Service 适配器与离线测试，`0029` 增加离线
   `dsh://auth/scnet` 回调解析和一次性 state 路由。
 - 生成或修改补丁后，必须在干净上游树运行 `./apply.sh` 或等价的完整 `git am` 回放验证。
 - CI 改动改的是 `.github/workflows/*` 与 `ci/*`；只有这几类路径才会触发 push 基础验证。
 
 已完成的主要能力：
-- 固定并预置 `dsh-scnet@0.6.10`，记录完整性、许可证和 loopback listener 导出。
+- 固定并预置 `dsh-scnet@0.6.13`，记录完整性、许可证和 loopback listener 导出。
 - 新安装 profile 默认激活 dsh-scnet；用户显式禁用、旧默认 profile、自定义 profile 的升级迁移已验证。
 - 本地只读 SCNet 诊断页已加入 Desktop 菜单；主窗口也显示可关闭的 SCNet 状态入口，且窗口重新获得焦点时刷新本地状态。Linux Secret Service 适配器已具备离线读写/清理接口。两者只读 Bundle、Python、backend、凭据和认证状态，
   不发起网络请求，不暴露凭据。

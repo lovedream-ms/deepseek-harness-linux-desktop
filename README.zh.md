@@ -8,7 +8,7 @@ macOS 版保持一致的非官方补丁集。
 上游只发布 macOS 与 Windows —— 其 `apps/desktop/README.md` 明确写着 Linux 不是受支持的桌面
 发布目标，打包测试也断言 `linux-x64` 目标必须被拒绝。本仓库就是把这层限制打开的那组 diff。
 
-> **状态：Linux x64 已迁移到上游 `dsh-v0.2.1-rc.2`，并已完成本机 typecheck、Linux package preflight 与 deb 构建。** 当前发布产物使用一个最终迁移 diff；旧 30 个主题补丁保存在归档目录中。Linux 发行包使用 deb；SCNet Bundle 固定为 `dsh-scnet@0.6.10`。
+> **状态：Linux x64 已迁移到上游 `dsh-v0.2.1-rc.2`，并已完成本机 typecheck、Linux package preflight 与 deb 构建。** 当前发布产物使用一个最终迁移 diff；旧 30 个主题补丁保存在归档目录中。Linux 发行包使用 deb；SCNet Bundle 固定为 `dsh-scnet@0.6.13`。
 
 基线：上游 tag **`dsh-v0.2.1-rc.2`**，当前补丁目录为一个最终迁移 diff。
 
@@ -137,7 +137,7 @@ sh "$PATCH_REPO/apply.sh" "$SRC"
 
 ```sh
 git -C "$SRC" log --oneline | head -1
-#   期望: "build(desktop): update the SCNet bundle to 0.6.10"
+#   期望: "build(desktop): update the SCNet bundle to 0.6.13"
 git -C "$SRC" rev-parse HEAD^{tree}
 #   期望: 当前这 29 个补丁系列对应的树哈希。跑一次 apply.sh 就能读到，它也会记录在
 #         发布流程的release notes 里。出现别的值说明有补丁没打上，或系列变了。
@@ -194,7 +194,7 @@ DEB=$(find "$ARTIFACTS" -maxdepth 1 -name '*.deb' -print -quit)
 node "$PATCH_REPO/ci/scnet-release-audit.mjs" \
   --deb "$DEB" \
   --package-set "$SRC/apps/desktop/.desktop-build/targets/linux-x64/package-set" \
-  --expected-version 0.6.10
+  --expected-version 0.6.13
 ```
 
 期望一个 deb 产物，名字来自产品版本（见 §6）。SCNet 发行审计使用产物自带的 Electron

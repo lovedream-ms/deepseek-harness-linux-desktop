@@ -10,7 +10,7 @@ Upstream ships macOS and Windows only — its own `apps/desktop/README.md` state
 `linux-x64` target must be rejected. This repository is the set of diffs that opens that
 path up.
 
-> **Status: Linux x64 is migrated to upstream `dsh-v0.2.1-rc.2`, with local typecheck, Linux package preflight, and deb build completed.** The current patch directory contains one final migration diff; the previous 30 topic patches remain archived for traceability. Linux releases use the deb package, with `dsh-scnet@0.6.10` bundled.
+> **Status: Linux x64 is migrated to upstream `dsh-v0.2.1-rc.2`, with local typecheck, Linux package preflight, and deb build completed.** The current patch directory contains one final migration diff; the previous 30 topic patches remain archived for traceability. Linux releases use the deb package, with `dsh-scnet@0.6.13` bundled.
 
 Base: upstream tag **`dsh-v0.2.1-rc.2`**, represented by one final migration diff.
 
@@ -143,7 +143,7 @@ Success conditions — all four must hold:
 
 ```sh
 git -C "$SRC" log --oneline | head -1
-#   expect: "build(desktop): update the SCNet bundle to 0.6.10"
+#   expect: "build(desktop): update the SCNet bundle to 0.6.13"
 git -C "$SRC" rev-parse HEAD^{tree}
 #   expect: the tree hash of this exact 26-patch series. Run apply.sh to read it; it is recorded
 #            by the publish workflow's release notes. A different value means a patch did not
@@ -204,7 +204,7 @@ DEB=$(find "$ARTIFACTS" -maxdepth 1 -name '*.deb' -print -quit)
 node "$PATCH_REPO/ci/scnet-release-audit.mjs" \
   --deb "$DEB" \
   --package-set "$SRC/apps/desktop/.desktop-build/targets/linux-x64/package-set" \
-  --expected-version 0.6.10
+  --expected-version 0.6.13
 ```
 
 Expect one deb artifact named from the product version (see [§6](#6-artifacts-and-where-they-land)).

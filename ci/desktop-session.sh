@@ -32,7 +32,7 @@ if [ "$PROFILE_EXPECTATION" = "disabled" ]; then
   mkdir -p "$DSH_HOME/profiles/desktop"
   printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app"]}}}' \
     >"$DSH_HOME/profiles/desktop/package.json"
-  printf '%s\n' '0.6.10' >"$DSH_HOME/profiles/desktop/.dsh-scnet.disabled"
+  printf '%s\n' '0.6.13' >"$DSH_HOME/profiles/desktop/.dsh-scnet.disabled"
 elif [ "$PROFILE_EXPECTATION" = "legacy-default" ]; then
   mkdir -p "$DSH_HOME/profiles/desktop"
   printf '%s\n' '{"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app"]}}}' \

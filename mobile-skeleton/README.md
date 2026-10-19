@@ -18,7 +18,7 @@ The scaffold intentionally does not contain:
 - a production browser callback registration;
 - Node, Python, Bash, SSH, or Desktop runtime code.
 
-The source contract is the published `dsh-scnet@0.6.10` connector contract.
+The source contract is the published `dsh-scnet@0.6.13` connector contract.
 Changes to that contract must still begin at canonical `scnet-hpc`, then flow
 through `dsh-scnet` before mobile adapters consume them.
 

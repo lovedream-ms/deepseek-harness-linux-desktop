@@ -2508,7 +2508,7 @@ index aa05966c4a..6e96ac8788 100644
    return {
      environment: update.environment,
 diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
-index 4b9cd27a8d..c97c30775f 100644
+index 4b9cd27a8d..ac5c1613cb 100644
 --- a/apps/desktop/scripts/electron-builder-config.mjs
 +++ b/apps/desktop/scripts/electron-builder-config.mjs
 @@ -19,7 +19,7 @@ import {
@@ -2559,7 +2559,26 @@ index 4b9cd27a8d..c97c30775f 100644
        ...buildVersion === productVersion ? {} : { version: buildVersion },
        ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
      },
-@@ -246,8 +251,33 @@ export function createElectronBuilderConfig(
+@@ -141,6 +146,7 @@ export function createElectronBuilderConfig(
+       'lib/preload-platform-account.cjs',
+       'lib/preload-update-dialog.cjs',
+       'lib/preload-welcome.cjs',
++      'lib/preload-scnet-diagnostics.cjs',
+       'renderer/**/*',
+       'package.json',
+       '!node_modules/**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+@@ -153,8 +159,9 @@ export function createElectronBuilderConfig(
+     extraResources: [
+       { from: buildPaths.runtime, to: 'runtime' },
+       { from: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
+-      // Windows tray bitmaps; macOS keeps the Dock and ships no menu bar icon.
++      // Windows uses a multi-size ICO; Linux uses a theme-sized PNG for StatusNotifier.
+       ...(packagesWindows ? [{ from: fileURLToPath(new URL('../resources/tray-windows.ico', import.meta.url)), to: 'tray.ico' }] : []),
++      ...(packagesLinux ? [{ from: fileURLToPath(new URL('../resources/icons/32x32.png', import.meta.url)), to: 'tray.png' }] : []),
+     ],
+     mac: {
+       icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
+@@ -246,8 +253,33 @@ export function createElectronBuilderConfig(
        target: ['nsis'],
      },
      linux: {
@@ -3100,11 +3119,148 @@ index 0c148e223f..a023582279 100644
      }
    })
    const names = new Set(packages.map(entry => entry.name))
+diff --git a/apps/desktop/src/harness-update.ts b/apps/desktop/src/harness-update.ts
+new file mode 100644
+index 0000000000..ddaa697d14
+--- /dev/null
++++ b/apps/desktop/src/harness-update.ts
+@@ -0,0 +1,124 @@
++/** Independent Harness-core update discovery for packaged Desktop builds. */
++
++import { valid, gt } from 'semver'
++import type { HarnessUpdatePresentation } from './ipc.ts'
++
++export interface HarnessUpdateDependencies {
++  readonly currentVersion: string
++  readonly environment?: NodeJS.ProcessEnv
++  readonly fetch?: typeof globalThis.fetch
++}
++
++const DEFAULT_RELEASES_URL = 'https://api.github.com/repos/lql341/deepseek-harness-linux-desktop/releases'
++const RELEASE_TAG = /^v(.+)-linux\.\d+$/u
++
++function record(value: unknown): value is Record<string, unknown> {
++  return typeof value === 'object' && value !== null && !Array.isArray(value)
++}
++
++function releaseVersion(tag: string): string | undefined {
++  const match = RELEASE_TAG.exec(tag)
++  if (match === null || valid(match[1]) === null) return undefined
++  return match[1]
++}
++
++function allowAlpha(environment: NodeJS.ProcessEnv): boolean {
++  return environment.DSH_HARNESS_UPDATE_ALLOW_ALPHA === '1'
++}
++
++function parseReleases(value: unknown, environment: NodeJS.ProcessEnv): { version: string; tag: string; url: string; notes?: string }[] {
++  if (!Array.isArray(value)) throw new Error('harness update: invalid release response')
++  const releases: { version: string; tag: string; url: string; notes?: string }[] = []
++  for (const entry of value) {
++    if (!record(entry)) continue
++    const tag = typeof entry.tag_name === 'string' ? entry.tag_name : undefined
++    const url = typeof entry.html_url === 'string' ? entry.html_url : undefined
++    if (tag === undefined || url === undefined || entry.draft === true) continue
++    let parsedUrl: URL
++    try { parsedUrl = new URL(url) } catch { continue }
++    if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'github.com') continue
++    const version = releaseVersion(tag)
++    if (version === undefined || (!allowAlpha(environment) && version.includes('-alpha'))) continue
++    releases.push({
++      version,
++      tag,
++      url,
++      ...(typeof entry.body === 'string' && entry.body !== '' ? { notes: entry.body } : {}),
++    })
++  }
++  return releases.sort((a, b) => gt(a.version, b.version) ? -1 : gt(b.version, a.version) ? 1 : 0)
++}
++
++export class HarnessUpdateCoordinator {
++  private current: HarnessUpdatePresentation
++  private pending: Promise<HarnessUpdatePresentation> | undefined
++  private disposed = false
++
++  constructor(private readonly dependencies: HarnessUpdateDependencies) {
++    this.current = { phase: 'idle', currentVersion: dependencies.currentVersion }
++  }
++
++  get state(): HarnessUpdatePresentation {
++    return this.current
++  }
++
++  async check(): Promise<HarnessUpdatePresentation> {
++    if (this.disposed) throw new Error('harness update: coordinator is disposed')
++    if (this.pending !== undefined) return this.pending
++    this.current = { phase: 'checking', currentVersion: this.dependencies.currentVersion }
++    this.pending = this.fetchLatest().then((state) => {
++      this.current = state
++      return state
++    }, () => {
++      this.current = { phase: 'error', currentVersion: this.dependencies.currentVersion, error: 'network' }
++      return this.current
++    }).finally(() => { this.pending = undefined })
++    return this.pending
++  }
++
++  async open(): Promise<string | undefined> {
++    const state = this.current.phase === 'idle' || this.current.phase === 'error'
++      ? await this.check() : this.current
++    return state.releaseUrl
++  }
++
++  dispose(): void {
++    this.disposed = true
++  }
++
++  private async fetchLatest(): Promise<HarnessUpdatePresentation> {
++    const environment = this.dependencies.environment ?? process.env
++    const fetcher = this.dependencies.fetch ?? globalThis.fetch
++    if (fetcher === undefined) throw new Error('harness update: fetch is unavailable')
++    const endpoint = environment.DSH_HARNESS_UPDATE_RELEASES_URL?.trim() || DEFAULT_RELEASES_URL
++    const response = await fetcher(endpoint, {
++      headers: { accept: 'application/vnd.github+json', 'user-agent': 'deepseek-harness-linux-desktop' },
++      signal: AbortSignal.timeout(10_000),
++    })
++    if (!response.ok) throw new Error(`harness update: HTTP ${response.status}`)
++    const releases = parseReleases(await response.json() as unknown, environment)
++    const latest = releases[0]
++    if (latest === undefined) {
++      return { phase: 'current', currentVersion: this.dependencies.currentVersion }
++    }
++    if (gt(latest.version, this.dependencies.currentVersion)) {
++      return {
++        phase: 'available',
++        currentVersion: this.dependencies.currentVersion,
++        availableVersion: latest.version,
++        releaseTag: latest.tag,
++        releaseUrl: latest.url,
++        ...(latest.notes === undefined ? {} : { notesUrl: latest.url }),
++      }
++    }
++    return { phase: 'current', currentVersion: this.dependencies.currentVersion }
++  }
++}
++
++export function parseHarnessReleases(value: unknown, environment: NodeJS.ProcessEnv = {}): readonly {
++  version: string
++  tag: string
++  url: string
++}[] {
++  return parseReleases(value, environment).map(({ version, tag, url }) => ({ version, tag, url }))
++}
 diff --git a/apps/desktop/src/ipc.ts b/apps/desktop/src/ipc.ts
-index fc19021fa6..cf62236a23 100644
+index fc19021fa6..245337d9a5 100644
 --- a/apps/desktop/src/ipc.ts
 +++ b/apps/desktop/src/ipc.ts
-@@ -31,6 +31,10 @@ export const DESKTOP_IPC = {
+@@ -27,10 +27,17 @@ export const DESKTOP_IPC = {
+   updatesStatus: 'dsh-desktop:updates-status',
+   updatesOpen: 'dsh-desktop:updates-open',
+   updatesPresentation: 'dsh-desktop:updates-presentation',
++  harnessUpdatesStatus: 'dsh-desktop:harness-updates-status',
++  harnessUpdatesOpen: 'dsh-desktop:harness-updates-open',
++  harnessUpdatesPresentation: 'dsh-desktop:harness-updates-presentation',
+   nativeThemeSet: 'dsh-desktop:native-theme-set',
    windowFullscreen: 'dsh-desktop:window-fullscreen',
    windowsAppearance: 'dsh-desktop:windows-appearance',
    windowsMenu: 'dsh-desktop:windows-menu',
@@ -3115,6 +3271,43 @@ index fc19021fa6..cf62236a23 100644
  } as const
  
  /** Desktop release update state rendered by desktop-owned UI. */
+@@ -63,11 +70,24 @@ export type DesktopUpdateFailureKind =
+ /** Semantic status content; actions open main-process confirmation dialogs only. */
+ export interface DesktopUpdatePresentation {
+   readonly phase: DesktopUpdateState['phase']
++  readonly currentVersion?: string
+   readonly version?: string
+   readonly percent?: number
+   readonly failure?: DesktopUpdateFailureKind
+ }
+ 
++export type HarnessUpdatePhase = 'idle' | 'checking' | 'current' | 'available' | 'error'
++
++export interface HarnessUpdatePresentation {
++  readonly phase: HarnessUpdatePhase
++  readonly currentVersion: string
++  readonly availableVersion?: string
++  readonly releaseTag?: string
++  readonly releaseUrl?: string
++  readonly notesUrl?: string
++  readonly error?: 'network' | 'invalid'
++}
++
+ /** Product documents cannot supply update versions, package URLs, or installation authorization. */
+ export interface DshDesktopProductApi {
+   readonly protocolVersion: 1
+@@ -84,6 +104,11 @@ export interface DshDesktopProductApi {
+     open(): Promise<void>
+     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
+   }
++  readonly harnessUpdate: {
++    status(): Promise<HarnessUpdatePresentation>
++    open(): Promise<void>
++    subscribe(listener: (state: HarnessUpdatePresentation) => void): () => void
++  }
+ }
+ 
+ /** Scheme of Desktop-owned application documents. */
 diff --git a/apps/desktop/src/locale.ts b/apps/desktop/src/locale.ts
 index 5d9d4607c7..9f12746cb3 100644
 --- a/apps/desktop/src/locale.ts
@@ -3204,10 +3397,177 @@ index 5d9d4607c7..9f12746cb3 100644
    restartAppHostMenu: '重启应用与 Host',
    updateCheckFailedTitle: '更新检查失败',
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..15310cd400 100644
+index 2afdfd7194..abfc12034c 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -1294,16 +1294,24 @@ async function main(): Promise<void> {
+@@ -1,5 +1,5 @@
+ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
+-import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
++import { usesTitleBarOverlay, WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
+ /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
+ 
+ import { readFile, writeFile } from 'node:fs/promises'
+@@ -61,6 +61,9 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
+ import { DesktopQuitConfirmation } from './quit-confirmation.ts'
+ import { DesktopTray } from './tray.ts'
+ import { DesktopBackgroundNotice } from './background-notice.ts'
++import { HarnessUpdateCoordinator } from './harness-update.ts'
++import { openScnetDiagnosticsWindow } from './scnet-diagnostics-window.ts'
++import { readScnetDiagnostics } from './scnet-diagnostics.ts'
+ 
+ let focusPrimaryWindow = (): void => {}
+ let stopForRecovery = async (): Promise<void> => {}
+@@ -212,7 +215,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+     minWidth: 520,
+     minHeight: 600,
+     show,
+-    ...(process.platform === 'win32' && primary ? {
++    ...(usesTitleBarOverlay(process.platform, process.env) && primary ? {
+       titleBarStyle: 'hidden' as const,
+       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
+         symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
+@@ -242,7 +245,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+     if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
+     return { action: 'deny' }
+   })
+-  if (process.platform === 'darwin' || process.platform === 'win32') {
++  if (process.platform === 'darwin' || usesTitleBarOverlay(process.platform, process.env)) {
+     // Fullscreen hides native window controls; overlays drop their caption clearance.
+     const sendFullscreen = (): void => {
+       if (!window.isDestroyed()) window.webContents.send(DESKTOP_IPC.windowFullscreen, window.isFullScreen())
+@@ -320,6 +323,11 @@ async function main(): Promise<void> {
+   const journalDirectory = process.env.DSH_DESKTOP_UPDATE_JOURNAL_DIR
+   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
+   const resources = runtimeResources()
++  const bundledHarnessVersion = app.isPackaged ? readDesktopRuntime(resources.dsh).release.version : app.getVersion()
++  const harnessUpdates = new HarnessUpdateCoordinator({
++    currentVersion: bundledHarnessVersion,
++    environment: process.env,
++  })
+   const paths = resolveDesktopPaths()
+   const development = !app.isPackaged
+   const primaryRuntime = development
+@@ -533,7 +541,7 @@ async function main(): Promise<void> {
+     updateState = state
+     mandatoryUI?.sync()
+     for (const window of BrowserWindow.getAllWindows()) {
+-      window.webContents.send(DESKTOP_IPC.updatesPresentation, presentDesktopUpdate(state))
++      window.webContents.send(DESKTOP_IPC.updatesPresentation, presentDesktopUpdate(state, app.getVersion()))
+     }
+     if (state.phase === 'error' && state.failedOperation !== 'check') {
+       const restoreHost = state.failedOperation === 'install' && updateStoppedHost && !quitting
+@@ -643,6 +651,12 @@ async function main(): Promise<void> {
+   )
+ 
+   const updateSchedule = new DesktopUpdateSchedule(updates, resolveDesktopUpdateScheduleConfig(process.env))
++  const publishHarnessUpdate = (): void => {
++    const state = harnessUpdates.state
++    for (const window of BrowserWindow.getAllWindows()) {
++      window.webContents.send(DESKTOP_IPC.harnessUpdatesPresentation, state)
++    }
++  }
+ 
+   const downloadUpdate = async (version: string): Promise<DesktopUpdateState> => {
+     void track('desktop_upgrade_click', {})
+@@ -771,7 +785,27 @@ async function main(): Promise<void> {
+   })
+   ipcMain.handle(DESKTOP_IPC.updatesStatus, (event) => {
+     assertProductSender(event)
+-    return presentDesktopUpdate(updates.state)
++    return presentDesktopUpdate(updates.state, app.getVersion())
++  })
++  ipcMain.handle(DESKTOP_IPC.harnessUpdatesStatus, (event) => {
++    assertProductSender(event)
++    return harnessUpdates.state
++  })
++  ipcMain.handle(DESKTOP_IPC.harnessUpdatesOpen, async (event) => {
++    assertProductSender(event)
++    const url = await harnessUpdates.open()
++    publishHarnessUpdate()
++    if (url !== undefined) await shell.openExternal(url)
++  })
++  ipcMain.handle(DESKTOP_IPC.scnetStatus, async (event) => {
++    assertProductSender(event)
++    return { locale: locale.id, diagnostics: await readScnetDiagnostics({ profilePath: paths.profile, environment: process.env }) }
++  })
++  ipcMain.handle(DESKTOP_IPC.scnetStatusOpenDiagnostics, async (event) => {
++    assertProductSender(event)
++    await openScnetDiagnosticsWindow(locale, {
++      read: () => readScnetDiagnostics({ profilePath: paths.profile, environment: process.env }),
++    })
+   })
+   ipcMain.handle(DESKTOP_IPC.deviceInfo, (event) => {
+     assertProductSender(event)
+@@ -921,10 +955,14 @@ async function main(): Promise<void> {
+   const automaticCheck = (): void => {
+     if (!quitting) void mandatoryPolicy?.check('foreground-or-resume').catch((error: unknown) => { console.error(error) })
+     if (!quitting) void updateSchedule.check().catch((error: unknown) => { console.error(error) })
++    if (app.isPackaged && process.env.NODE_ENV !== 'test' && !quitting) {
++      void harnessUpdates.check().then(publishHarnessUpdate).catch((error: unknown) => { console.error(error) })
++    }
+   }
+   powerMonitor.on('resume', automaticCheck)
+   app.on('will-quit', () => {
+     updateSchedule.dispose()
++    harnessUpdates.dispose()
+     powerMonitor.off('resume', automaticCheck)
+     updates.dispose()
+   })
+@@ -960,6 +998,11 @@ async function main(): Promise<void> {
+       : { label: currentDesktopLocale().messages.aboutMenu, role: 'about' },
+     { type: 'separator' },
+     { label: currentDesktopLocale().messages.checkUpdatesMenu, click: () => { void openUpdatePrompt(true) } },
++    { label: currentDesktopLocale().messages.scnetDiagnosticsMenu, click: () => {
++      void openScnetDiagnosticsWindow(currentDesktopLocale(), {
++        read: () => readScnetDiagnostics({ profilePath: paths.profile, environment: process.env }),
++      }).catch((error: unknown) => { console.error(error) })
++    } },
+     ...process.platform === 'darwin' || process.platform === 'win32'
+       ? [{ label: currentDesktopLocale().messages.cliCommandMenu, click: () => { void commandManager.show() } }] : [],
+     ...development ? [
+@@ -972,9 +1015,14 @@ async function main(): Promise<void> {
+       } },
+     ] : [],
+     { type: 'separator' },
++    ...(process.platform === 'linux' ? [
++      { label: currentDesktopLocale().messages.showWindowMenu, click: () => { focusPrimaryWindow() } },
++      { type: 'separator' as const },
++    ] : []),
+     ...hideCommands,
+     { role: 'quit', ...(darwin ? { label: currentDesktopLocale().messages.quitApplication }
+-      : process.platform === 'win32' ? { label: currentDesktopLocale().messages.exitApplication } : {}) },
++      : process.platform === 'win32' ? { label: currentDesktopLocale().messages.exitApplication }
++        : { label: currentDesktopLocale().messages.quit }) },
+   ]
+   const devToolsItems: MenuItemConstructorOptions[] = [
+     { role: 'toggleDevTools', visible: false },
+@@ -988,9 +1036,13 @@ async function main(): Promise<void> {
+     tray?.relabel()
+   }
+   refreshApplicationMenu()
+-  const trayIconPath = development ? join(app.getAppPath(), 'resources', 'tray-windows.ico') : join(process.resourcesPath, 'tray.ico')
+-  if (process.platform === 'win32') {
+-    // The tray is the way back to a hidden window; without it, relaunching the application still focuses it.
++  const trayIconPath = development
++    ? process.platform === 'win32'
++      ? join(app.getAppPath(), 'resources', 'tray-windows.ico')
++      : join(app.getAppPath(), 'resources', 'icons', '32x32.png')
++    : join(process.resourcesPath, process.platform === 'win32' ? 'tray.ico' : 'tray.png')
++  if (process.platform === 'win32' || process.platform === 'linux') {
++    // The tray is the way back to a hidden window on Linux and Windows.
+     try {
+       tray = new DesktopTray({ iconPath: trayIconPath, locale: currentDesktopLocale,
+         open: () => { focusPrimaryWindow() }, quit: () => { app.quit() } })
+@@ -1242,7 +1294,7 @@ async function main(): Promise<void> {
+     if (!hasVisibleWindows) focusPrimaryWindow()
+   })
+   app.on('window-all-closed', () => {
+-    if (process.platform !== 'darwin') app.quit()
++    if (process.platform === 'win32') app.quit()
+   })
+   if (process.platform !== 'win32') powerMonitor.on('shutdown', () => { sessionEnding = true })
+   const finishQuit = (): void => {
+@@ -1294,16 +1346,24 @@ async function main(): Promise<void> {
      ? ('dshMandatoryUpdatePolicy' in manifest ? manifest.dshMandatoryUpdatePolicy : undefined)
      : developmentPolicy === undefined ? undefined : JSON.parse(developmentPolicy) as unknown
    const policyConfig = resolveDesktopPolicyConfig(policyInput, !app.isPackaged)
@@ -3236,22 +3596,47 @@ index 2afdfd7194..15310cd400 100644
        bundledDshVersion: app.isPackaged ? readDesktopRuntime(resources.dsh).release.version : app.getVersion(),
      }, (state) => {
 diff --git a/apps/desktop/src/preload-app.ts b/apps/desktop/src/preload-app.ts
-index f590b8bc8b..970e0b0e9f 100644
+index f590b8bc8b..a79d624769 100644
 --- a/apps/desktop/src/preload-app.ts
 +++ b/apps/desktop/src/preload-app.ts
-@@ -9,6 +9,7 @@ import { syncNativeTheme } from './preload-theme.ts'
+@@ -3,12 +3,15 @@
+ import type { DesktopShortcutInput, ShortcutConfigSnapshot, ShortcutSaveResult } from '@deepseek-ai/dsh-client-shortcuts/protocol'
+ import { contextBridge, ipcRenderer, webUtils } from 'electron'
+ import { DESKTOP_IPC, SCHEME, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
++import type { HarnessUpdatePresentation } from './ipc.ts'
+ import { PLATFORM_IPC } from './platform-ipc.ts'
+ import { markDocumentPlatform, syncWindowFullscreen } from './preload-platform.ts'
+ import { syncNativeTheme } from './preload-theme.ts'
  import { syncWindowsAppearance } from './preload-windows.ts'
  import { installMandatoryUpdateOverlay } from './preload-mandatory-overlay.ts'
  import { createDesktopBrowserBridge } from './preload-browser.ts'
 +import { installScnetStatusSurface } from './preload-scnet-status.ts'
++import { installUpdateStatusSurface } from './preload-update-status.ts'
  
  function createProductApi(): DshDesktopProductApi {
    return {
-@@ -104,4 +105,5 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
+@@ -55,6 +58,15 @@ function createProductApi(): DshDesktopProductApi {
+         return () => { ipcRenderer.off(DESKTOP_IPC.updatesPresentation, handle) }
+       },
+     },
++    harnessUpdate: {
++      status: () => ipcRenderer.invoke(DESKTOP_IPC.harnessUpdatesStatus) as Promise<HarnessUpdatePresentation>,
++      open: () => ipcRenderer.invoke(DESKTOP_IPC.harnessUpdatesOpen) as Promise<void>,
++      subscribe(listener) {
++        const handle = (_event: Electron.IpcRendererEvent, state: HarnessUpdatePresentation): void => { listener(state) }
++        ipcRenderer.on(DESKTOP_IPC.harnessUpdatesPresentation, handle)
++        return () => { ipcRenderer.off(DESKTOP_IPC.harnessUpdatesPresentation, handle) }
++      },
++    },
+   }
+ }
+ 
+@@ -104,4 +116,6 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
      read: () => ipcRenderer.invoke(DESKTOP_IPC.localeBootstrap),
      onChange: (locale: string) => { ipcRenderer.send(DESKTOP_IPC.localeChanged, locale) },
    })
 +  installScnetStatusSurface()
++  installUpdateStatusSurface()
  }
 diff --git a/apps/desktop/src/preload-platform.ts b/apps/desktop/src/preload-platform.ts
 index 1e197b0c76..710bb71452 100644
@@ -3441,6 +3826,176 @@ index 0000000000..62b92b62ce
 +}
 +
 +export function installScnetStatusSurface(): void {
++  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true })
++  else install()
++}
+diff --git a/apps/desktop/src/preload-update-status.ts b/apps/desktop/src/preload-update-status.ts
+new file mode 100644
+index 0000000000..8da5ff0cda
+--- /dev/null
++++ b/apps/desktop/src/preload-update-status.ts
+@@ -0,0 +1,164 @@
++/** Shell-owned lower-left update entry point for the client and Harness core. */
++
++import { ipcRenderer } from 'electron'
++import { DESKTOP_IPC, type DesktopUpdatePresentation } from './ipc.ts'
++import type { HarnessUpdatePresentation } from './ipc.ts'
++
++const copy = {
++  en: {
++    title: 'Updates',
++    current: 'Client {client} · Harness {harness}',
++    checking: 'Checking for updates…',
++    available: 'Harness {version} is available',
++    clientAvailable: 'Client {version} is available',
++    client: 'Open client update',
++    harness: 'View Harness release',
++    close: 'Dismiss',
++  },
++  'zh-CN': {
++    title: '更新',
++    current: '客户端 {client} · Harness {harness}',
++    checking: '正在检查更新…',
++    available: 'Harness {version} 可用',
++    clientAvailable: '客户端 {version} 可用',
++    client: '查看客户端更新',
++    harness: '查看 Harness 发布',
++    close: '关闭',
++  },
++} as const
++
++interface UpdateBridge {
++  clientStatus(): Promise<DesktopUpdatePresentation>
++  clientOpen(): Promise<void>
++  clientSubscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
++  harnessStatus(): Promise<HarnessUpdatePresentation>
++  harnessOpen(): Promise<void>
++  harnessSubscribe(listener: (state: HarnessUpdatePresentation) => void): () => void
++}
++
++const bridge: UpdateBridge = {
++  clientStatus: () => ipcRenderer.invoke(DESKTOP_IPC.updatesStatus) as Promise<DesktopUpdatePresentation>,
++  clientOpen: () => ipcRenderer.invoke(DESKTOP_IPC.updatesOpen) as Promise<void>,
++  clientSubscribe(listener) {
++    const handle = (_event: Electron.IpcRendererEvent, state: DesktopUpdatePresentation): void => listener(state)
++    ipcRenderer.on(DESKTOP_IPC.updatesPresentation, handle)
++    return () => { ipcRenderer.off(DESKTOP_IPC.updatesPresentation, handle) }
++  },
++  harnessStatus: () => ipcRenderer.invoke(DESKTOP_IPC.harnessUpdatesStatus) as Promise<HarnessUpdatePresentation>,
++  harnessOpen: () => ipcRenderer.invoke(DESKTOP_IPC.harnessUpdatesOpen) as Promise<void>,
++  harnessSubscribe(listener) {
++    const handle = (_event: Electron.IpcRendererEvent, state: HarnessUpdatePresentation): void => listener(state)
++    ipcRenderer.on(DESKTOP_IPC.harnessUpdatesPresentation, handle)
++    return () => { ipcRenderer.off(DESKTOP_IPC.harnessUpdatesPresentation, handle) }
++  },
++}
++
++function install(): void {
++  if (document.querySelector('[data-dsh-update-status]') !== null) return
++  const host = document.createElement('div')
++  host.dataset.dshUpdateStatus = ''
++  const shadow = host.attachShadow({ mode: 'open' })
++  const style = document.createElement('style')
++  style.textContent = `
++    :host { all: initial; }
++    .surface { align-items: center; backdrop-filter: blur(14px); background: color-mix(in srgb, Canvas 90%, transparent);
++      border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 10px; box-shadow: 0 5px 22px rgb(0 0 0 / 12%);
++      color: CanvasText; display: grid; font: 12px/16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++      gap: 5px; max-width: min(390px, calc(100vw - 28px)); padding: 9px 10px 9px 11px; }
++    .top { align-items: center; display: flex; gap: 8px; }
++    .dot { background: #8d9298; border-radius: 50%; flex: 0 0 8px; height: 8px; width: 8px; }
++    .dot[data-state="available"] { background: #c74b4b; }
++    .dot[data-state="checking"] { background: #d28c24; }
++    .copy { display: grid; gap: 1px; min-width: 0; }
++    .title { font-weight: 650; }
++    .detail { color: color-mix(in srgb, CanvasText 68%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++    .actions { display: flex; gap: 9px; padding-left: 16px; }
++    button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 2px 0; text-align: left; }
++    button:hover { text-decoration: underline; }
++    button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
++    .dismiss { color: color-mix(in srgb, CanvasText 52%, transparent); font-size: 16px; line-height: 16px; margin-left: auto; padding: 0 2px 2px 3px; }
++  `
++  const surface = document.createElement('div')
++  surface.className = 'surface'
++  const top = document.createElement('div')
++  top.className = 'top'
++  const dot = document.createElement('span')
++  dot.className = 'dot'
++  dot.setAttribute('aria-hidden', 'true')
++  const copyBox = document.createElement('span')
++  copyBox.className = 'copy'
++  const title = document.createElement('span')
++  title.className = 'title'
++  const detail = document.createElement('span')
++  detail.className = 'detail'
++  copyBox.append(title, detail)
++  const dismiss = document.createElement('button')
++  dismiss.className = 'dismiss'
++  dismiss.type = 'button'
++  dismiss.textContent = '×'
++  top.append(dot, copyBox, dismiss)
++  const actions = document.createElement('div')
++  actions.className = 'actions'
++  const client = document.createElement('button')
++  client.type = 'button'
++  const harness = document.createElement('button')
++  harness.type = 'button'
++  actions.append(client, harness)
++  surface.append(top, actions)
++  shadow.append(style, surface)
++  Object.assign(host.style, { bottom: '14px', left: '14px', position: 'fixed', zIndex: '2147483640' })
++  document.body.append(host)
++
++  let clientState: DesktopUpdatePresentation = { phase: 'idle' }
++  let harnessState: HarnessUpdatePresentation = { phase: 'idle', currentVersion: 'unknown' }
++  const language = (document.documentElement.lang || navigator.language).toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'
++  const m = copy[language]
++  function render(): void {
++    const clientVersion = clientState.currentVersion ?? '—'
++    const harnessVersion = harnessState.currentVersion
++    const available = harnessState.phase === 'available'
++    const clientAvailable = clientState.phase === 'available' || clientState.phase === 'ready'
++    title.textContent = m.title
++    detail.textContent = available && harnessState.availableVersion !== undefined
++      ? m.available.replace('{version}', harnessState.availableVersion)
++      : clientAvailable && clientState.version !== undefined
++        ? m.clientAvailable.replace('{version}', clientState.version)
++      : harnessState.phase === 'checking' || clientState.phase === 'checking'
++        ? m.checking : m.current.replace('{client}', clientVersion).replace('{harness}', harnessVersion)
++    dot.dataset.state = available || clientAvailable ? 'available' : harnessState.phase === 'checking' || clientState.phase === 'checking' ? 'checking' : 'current'
++    client.textContent = m.client
++    harness.textContent = m.harness
++    dismiss.setAttribute('aria-label', m.close)
++    client.disabled = clientState.phase === 'checking' || clientState.phase === 'downloading' || clientState.phase === 'installing'
++    harness.disabled = harnessState.phase === 'checking'
++  }
++  async function refresh(): Promise<void> {
++    try {
++      ;[clientState, harnessState] = await Promise.all([bridge.clientStatus(), bridge.harnessStatus()])
++      render()
++    } catch { dispose() }
++  }
++  function dispose(): void {
++    stopClient()
++    stopHarness()
++    window.removeEventListener('focus', onFocus)
++    window.removeEventListener('pagehide', onPageHide)
++    host.remove()
++  }
++  const stopClient = bridge.clientSubscribe(state => { clientState = state; render() })
++  const stopHarness = bridge.harnessSubscribe(state => { harnessState = state; render() })
++  function onFocus(): void { void refresh() }
++  function onPageHide(): void { dispose() }
++  dismiss.addEventListener('click', dispose)
++  client.addEventListener('click', () => { void bridge.clientOpen().catch(() => {}) })
++  harness.addEventListener('click', () => { void bridge.harnessOpen().catch(() => {}) })
++  window.addEventListener('focus', onFocus)
++  window.addEventListener('pagehide', onPageHide, { once: true })
++  render()
++  void refresh()
++}
++
++export function installUpdateStatusSurface(): void {
 +  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true })
 +  else install()
 +}
@@ -3745,7 +4300,7 @@ index 0000000000..76dc212837
 +}
 diff --git a/apps/desktop/src/scnet-bundle.ts b/apps/desktop/src/scnet-bundle.ts
 new file mode 100644
-index 0000000000..741961ec59
+index 0000000000..6c32badb1f
 --- /dev/null
 +++ b/apps/desktop/src/scnet-bundle.ts
 @@ -0,0 +1,18 @@
@@ -3755,7 +4310,7 @@ index 0000000000..741961ec59
 +export const SCNET_BUNDLE_PACKAGE = 'dsh-scnet'
 +
 +/** Exact published bundle version embedded in this Desktop release. */
-+export const SCNET_BUNDLE_VERSION = '0.6.10'
++export const SCNET_BUNDLE_VERSION = '0.6.13'
 +
 +/** Package spec fetched only while assembling a Desktop release. */
 +export const SCNET_BUNDLE_SPEC = `${SCNET_BUNDLE_PACKAGE}@${SCNET_BUNDLE_VERSION}`
@@ -4212,6 +4767,40 @@ index 7911b46c5b..f4401477a9 100644
 +  })
    return true
  }
+diff --git a/apps/desktop/src/tray.ts b/apps/desktop/src/tray.ts
+index b2ce416bbc..b4f89dbbad 100644
+--- a/apps/desktop/src/tray.ts
++++ b/apps/desktop/src/tray.ts
+@@ -1,11 +1,11 @@
+-/** Windows system tray: the always-present way back to a hidden window and the explicit quit entry. */
++/** Linux and Windows system tray: the way back to a hidden window and the explicit quit entry. */
+ 
+ import { Menu, nativeImage, Tray } from 'electron'
+ import type { DesktopLocale } from './locale.ts'
+ 
+ /** Main-process actions the tray triggers; both run the same paths as the window and application menu. */
+ export interface DesktopTrayOptions {
+-  /** Multi-size ICO rendered by `scripts/render-tray-icon.ts`; Windows picks the bitmap for the display scale. */
++  /** Platform tray image: multi-size ICO on Windows, theme-sized PNG on Linux. */
+   readonly iconPath: string
+   readonly locale: () => DesktopLocale
+   /** Show and focus the primary window. */
+diff --git a/apps/desktop/src/update-presentation.ts b/apps/desktop/src/update-presentation.ts
+index 42119d93a2..5bddb0146b 100644
+--- a/apps/desktop/src/update-presentation.ts
++++ b/apps/desktop/src/update-presentation.ts
+@@ -41,9 +41,10 @@ export function desktopUpdateErrorSummary(state: DesktopUpdateState, messages: D
+  * @param state - Main-process updater state.
+  * @returns Semantic status without localized copy, diagnostics, or installation controls.
+  */
+-export function presentDesktopUpdate(state: DesktopUpdateState): DesktopUpdatePresentation {
++export function presentDesktopUpdate(state: DesktopUpdateState, currentVersion?: string): DesktopUpdatePresentation {
+   return {
+     phase: state.phase,
++    ...(currentVersion === undefined ? {} : { currentVersion }),
+     ...(state.version === undefined ? {} : { version: state.version }),
+     ...(state.percent === undefined ? {} : { percent: Math.floor(state.percent) }),
+     ...(state.phase === 'error' ? { failure: desktopUpdateFailureKind(state) } : {}),
 diff --git a/apps/desktop/src/welcome-window.ts b/apps/desktop/src/welcome-window.ts
 index 61fda9e36a..5c5ca4d096 100644
 --- a/apps/desktop/src/welcome-window.ts
@@ -4534,6 +5123,48 @@ index ede5c5e3d3..a785e77e41 100644
 +    expect(() => desktopTargetBuildPaths('linux-arm64' as 'mac-x64')).toThrow(/unsupported target/u)
    })
  })
+diff --git a/apps/desktop/tests/harness-update.spec.ts b/apps/desktop/tests/harness-update.spec.ts
+new file mode 100644
+index 0000000000..43d726486c
+--- /dev/null
++++ b/apps/desktop/tests/harness-update.spec.ts
+@@ -0,0 +1,36 @@
++import { describe, expect, it } from 'vitest'
++import { HarnessUpdateCoordinator, parseHarnessReleases } from '../src/harness-update.ts'
++
++describe('Harness update discovery', () => {
++  const releases = [
++    { tag_name: 'v0.2.1-alpha.1-linux.1', html_url: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-alpha.1-linux.1', draft: false },
++    { tag_name: 'v0.2.1-rc.3-linux.1', html_url: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-rc.3-linux.1', draft: false },
++    { tag_name: 'v0.2.1-rc.2-linux.1', html_url: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-rc.2-linux.1', draft: false },
++  ]
++
++  it('sorts releases and excludes alpha by default', () => {
++    expect(parseHarnessReleases(releases)).toEqual([
++      { version: '0.2.1-rc.3', tag: 'v0.2.1-rc.3-linux.1', url: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-rc.3-linux.1' },
++      { version: '0.2.1-rc.2', tag: 'v0.2.1-rc.2-linux.1', url: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-rc.2-linux.1' },
++    ])
++  })
++
++  it('reports a newer core without accepting a renderer-supplied URL', async () => {
++    const coordinator = new HarnessUpdateCoordinator({
++      currentVersion: '0.2.1-rc.2',
++      fetch: async () => new Response(JSON.stringify(releases), { status: 200 }),
++      environment: {},
++    })
++    await expect(coordinator.check()).resolves.toMatchObject({
++      phase: 'available',
++      availableVersion: '0.2.1-rc.3',
++      releaseUrl: 'https://github.com/lql341/deepseek-harness-linux-desktop/releases/tag/v0.2.1-rc.3-linux.1',
++    })
++  })
++
++  it('allows alpha only when explicitly enabled', () => {
++    expect(parseHarnessReleases(releases, { DSH_HARNESS_UPDATE_ALLOW_ALPHA: '1' }).find(item => item.version.includes('-alpha'))).toMatchObject({
++      version: '0.2.1-alpha.1',
++    })
++  })
++})
 diff --git a/apps/desktop/tests/installer-packaging.spec.ts b/apps/desktop/tests/installer-packaging.spec.ts
 index 15a4610d98..a28e0a7972 100644
 --- a/apps/desktop/tests/installer-packaging.spec.ts
@@ -4736,7 +5367,7 @@ index d9a8f3103b..c7c14f6f51 100644
      vi.stubGlobal('process', { ...process, platform: 'darwin', arch: 'arm64', resourcesPath: 'desktop-test-resources' })
      const host = await readyWorkspace()
 diff --git a/apps/desktop/tests/package-target-stages.spec.ts b/apps/desktop/tests/package-target-stages.spec.ts
-index 1d8b067390..af47f89b34 100644
+index 1d8b067390..d04e26a03b 100644
 --- a/apps/desktop/tests/package-target-stages.spec.ts
 +++ b/apps/desktop/tests/package-target-stages.spec.ts
 @@ -169,6 +169,9 @@ it.each([undefined, '2'])('passes macOS pack concurrency %s only to workspace pa
@@ -4744,7 +5375,7 @@ index 1d8b067390..af47f89b34 100644
    const packs = calls.filter(call => call[0].startsWith('run release:pack'))
    expect(packs).toHaveLength(2)
 +  expect(calls.map(call => call[0])).toContainEqual(expect.stringMatching(
-+    /^dlx npm@12 pack dsh-scnet@0\.6\.10 --pack-destination .*packed[/\\]scnet$/u,
++    /^dlx npm@12 pack dsh-scnet@0\.6\.13 --pack-destination .*packed[/\\]scnet$/u,
 +  ))
    for (const call of packs) expect(call[2].slice(-2)).toEqual(['--concurrency', concurrency ?? '4'])
    for (const call of calls) {
@@ -4821,7 +5452,7 @@ index 5b876ab343..8e86ae8e79 100644
    expect(on).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.windowFullscreen, expect.any(Function))
 diff --git a/apps/desktop/tests/preload-scnet-status.spec.ts b/apps/desktop/tests/preload-scnet-status.spec.ts
 new file mode 100644
-index 0000000000..49114f12f3
+index 0000000000..949eb6db06
 --- /dev/null
 +++ b/apps/desktop/tests/preload-scnet-status.spec.ts
 @@ -0,0 +1,103 @@
@@ -4845,7 +5476,7 @@ index 0000000000..49114f12f3
 +      locale: 'zh-CN',
 +      diagnostics: {
 +        overall: 'needs-setup',
-+        bundle: { state: 'ready', detail: '0.6.10' },
++        bundle: { state: 'ready', detail: '0.6.13' },
 +        python: { state: 'ready', detail: 'Python 3.12' },
 +        credentials: { state: 'needs-setup', detail: 'Secret Service' },
 +        backend: { state: 'ready', detail: 'openapi' },
@@ -4856,7 +5487,7 @@ index 0000000000..49114f12f3
 +    installScnetStatusSurface()
 +    await vi.waitFor(() => { expect(document.querySelector('[data-dsh-scnet-status]')).not.toBeNull() })
 +    const host = document.querySelector('[data-dsh-scnet-status]')!
-+    expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('Bundle 0.6.10')
++    expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('Bundle 0.6.13')
 +    expect(host.shadowRoot?.querySelector('.detail')?.textContent).toContain('需要授权')
 +    expect(invoke).toHaveBeenCalledWith('dsh-desktop:scnet-status')
 +  })
@@ -4866,7 +5497,7 @@ index 0000000000..49114f12f3
 +      locale: 'en',
 +      diagnostics: {
 +        overall: 'ready',
-+        bundle: { state: 'ready', detail: '0.6.10' },
++        bundle: { state: 'ready', detail: '0.6.13' },
 +        python: { state: 'ready', detail: 'Python 3.12' },
 +        credentials: { state: 'ready', detail: 'configured' },
 +        backend: { state: 'ready', detail: 'openapi' },
@@ -4897,7 +5528,7 @@ index 0000000000..49114f12f3
 +        locale: snapshots[0].locale,
 +        diagnostics: {
 +          overall: snapshots[0].overall,
-+          bundle: { state: 'ready', detail: '0.6.10' },
++          bundle: { state: 'ready', detail: '0.6.13' },
 +          python: { state: 'ready', detail: 'Python 3.12' },
 +          credentials: { state: 'needs-setup', detail: 'Secret Service' },
 +          backend: { state: 'ready', detail: 'openapi' },
@@ -4908,7 +5539,7 @@ index 0000000000..49114f12f3
 +        locale: snapshots[1].locale,
 +        diagnostics: {
 +          overall: snapshots[1].overall,
-+          bundle: { state: 'ready', detail: '0.6.10' },
++          bundle: { state: 'ready', detail: '0.6.13' },
 +          python: { state: 'ready', detail: 'Python 3.12' },
 +          credentials: { state: 'ready', detail: 'configured' },
 +          backend: { state: 'ready', detail: 'openapi' },
@@ -5139,7 +5770,7 @@ index 0000000000..158e5fb891
 +})
 diff --git a/apps/desktop/tests/scnet-diagnostics-window.spec.ts b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
 new file mode 100644
-index 0000000000..36dfcb2b30
+index 0000000000..cb6f9ebf33
 --- /dev/null
 +++ b/apps/desktop/tests/scnet-diagnostics-window.spec.ts
 @@ -0,0 +1,71 @@
@@ -5197,7 +5828,7 @@ index 0000000000..36dfcb2b30
 +  const window = await openScnetDiagnosticsWindow(resolveDesktopLocale('en'), {
 +    read: async () => ({
 +      overall: 'needs-setup',
-+      bundle: { state: 'ready', detail: '0.6.10' },
++      bundle: { state: 'ready', detail: '0.6.13' },
 +      python: { state: 'ready', detail: '3.12.1 (python3)' },
 +      credentials: { state: 'needs-setup', detail: 'not configured' },
 +      backend: { state: 'needs-setup', detail: 'openapi' },
@@ -5216,7 +5847,7 @@ index 0000000000..36dfcb2b30
 +})
 diff --git a/apps/desktop/tests/scnet-diagnostics.spec.ts b/apps/desktop/tests/scnet-diagnostics.spec.ts
 new file mode 100644
-index 0000000000..107d7c35d8
+index 0000000000..a2886ad8f5
 --- /dev/null
 +++ b/apps/desktop/tests/scnet-diagnostics.spec.ts
 @@ -0,0 +1,91 @@
@@ -5235,7 +5866,7 @@ index 0000000000..107d7c35d8
 +  const root = mkdtempSync(join(tmpdir(), 'dsh-scnet-diagnostics-'))
 +  roots.push(root)
 +  writeFileSync(join(root, 'package.json'), JSON.stringify({ dsh: { profile: { bundles } } }))
-+  if (disabled) writeFileSync(join(root, '.dsh-scnet.disabled'), '0.6.10\n')
++  if (disabled) writeFileSync(join(root, '.dsh-scnet.disabled'), '0.6.13\n')
 +  return root
 +}
 +
@@ -5259,7 +5890,7 @@ index 0000000000..107d7c35d8
 +    })
 +    expect(result).toEqual({
 +      overall: 'ready',
-+      bundle: { state: 'ready', detail: '0.6.10' },
++      bundle: { state: 'ready', detail: '0.6.13' },
 +      python: { state: 'ready', detail: '3.12.1 (python3)' },
 +      credentials: { state: 'ready', detail: 'configured' },
 +      backend: { state: 'ready', detail: 'openapi' },
@@ -5278,7 +5909,7 @@ index 0000000000..107d7c35d8
 +      commandExists: () => false,
 +    })
 +    expect(result.overall).toBe('disabled')
-+    expect(result.bundle).toEqual({ state: 'disabled', detail: '0.6.10' })
++    expect(result.bundle).toEqual({ state: 'disabled', detail: '0.6.13' })
 +    expect(result.credentials).toEqual({ state: 'needs-setup', detail: 'not configured' })
 +  })
 +
@@ -5443,7 +6074,7 @@ index 6d2807c425..9e07b0e666 100644
      const window = createWindow()
      const loaded = Promise.withResolvers<undefined>()
 diff --git a/apps/desktop/tsdown.config.ts b/apps/desktop/tsdown.config.ts
-index d8470bac7b..37a9a7f56c 100644
+index d8470bac7b..92f648d343 100644
 --- a/apps/desktop/tsdown.config.ts
 +++ b/apps/desktop/tsdown.config.ts
 @@ -90,7 +90,7 @@ export default defineConfig([
@@ -5451,7 +6082,7 @@ index d8470bac7b..37a9a7f56c 100644
      deps: { neverBundle: ['electron'] },
    },
 -  ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog'] as const).map(name => ({
-+  ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog', 'preload-scnet-diagnostics'] as const).map(name => ({
++  ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog', 'preload-scnet-diagnostics', 'preload-update-status'] as const).map(name => ({
      // Sandboxed Electron preloads run as CommonJS even though the application package is ESM.
      entry: { [name]: `lib/types/${name}.js` },
      plugins: [packagedImportsPlugin(preloadImports)],

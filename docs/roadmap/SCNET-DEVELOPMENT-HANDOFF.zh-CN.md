@@ -69,7 +69,7 @@
 
 ### M1：Desktop 预制 Bundle 与离线能力
 
-- [x] 固定 `dsh-scnet@0.6.10` 并纳入 Desktop package set
+- [x] 固定 `dsh-scnet@0.6.13` 并纳入 Desktop package set
 - [x] 新安装 profile 默认激活 Bundle
 - [x] 用户显式禁用状态跨升级保留
 - [x] Python 3 路径注入和错误路径拒绝
@@ -81,7 +81,7 @@
   state 路由和 Linux 第二次启动参数转发，`0030` 修复目录选择器 preload 集成测试的
   SCNet 状态 mock 隔离
 - [x] Desktop 定向测试 `170/170` 和 host build
-- [x] `dsh-scnet@0.6.10` connector 测试 `26/26` 和 package validate 通过；npm 包为 55 个文件、
+- [x] `dsh-scnet@0.6.13` connector 测试和 package validate 通过；npm 包为 55 个文件、
   MIT 许可证，未引入凭证或 endpoint
 - [x] Ubuntu 24.04 基础 deb 安装、首次启动和 `dsh://` 激活 CI 验收（Run `38233490072`）
 - [x] Debian 13 离线安装、首次启动、profile 状态、`dsh://` 激活和卸载在手动多发行版 Run `38233720311` 验收通过；该 job 只在 `run-multidistro=true` 时运行，不阻塞 push
@@ -91,8 +91,8 @@
 - [x] 旧默认 profile、显式禁用状态和自定义 profile 的发行包迁移验收（Run `38336572137`）
 - [x] 发布包内容、凭据、内部 endpoint、缓存和生成文件扫描
 - [x] draft `.5` 产物验证（发布 Run `38516862762`，验证 Run `38521128578`）
-- [x] canonical `scnet-hpc`、`dsh-scnet` npm/GitHub、`codex-scnet-hpc` 和 Desktop Bundle
-  已按源头顺序发布/同步到 `0.6.10`
+- [x] 历史 `0.6.10` 发布链路已记录；当前 Desktop Bundle 固定为 `dsh-scnet@0.6.13`，
+  新版本的 canonical → `dsh-scnet` → Desktop 同步证据待补录
 - [x] 公开 `v0.2.0-rc.2-linux.6` 发布与发布字节复验（预检 Run `38709921855`，
   发布 Run `38729878217`，验证 Run `38731899365`）
 - [x] 上游 `dsh-v0.2.1-rc.2` Linux 迁移、deb 构建和公开
@@ -107,7 +107,7 @@
 - [x] callback 一次性消费和重放拒绝
 - [x] 稳定错误码和 JSON error envelope
 - [x] 凭据存储适配器接口，禁止明文回退
-- [x] 协议无关的 loopback callback 监听器（`dsh-scnet@0.6.10`）
+- [x] 协议无关的 loopback callback 监听器（当前 Desktop 固定 `dsh-scnet@0.6.13`）
 - [ ] 真实 issuer / endpoint 接入（阻塞：等待合同）
 - [ ] 真实 sandbox 登录、刷新、撤销（阻塞：等待凭证）
 - [ ] 账户关联 API（阻塞：等待合同）
@@ -134,10 +134,10 @@
 
 | 仓库 | 分支/提交 | 当前交付 |
 |---|---|---|
-| `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
-| `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
-| `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / `3d53fb1` | 上游基线 `dsh-v0.2.1-rc.2`；当前目录为一个最终迁移 diff，旧 30 个主题补丁归档；固定 `dsh-scnet@0.6.10`；公开 release `v0.2.1-rc.2-linux.1`，旧 `v0.2.0-rc.2-linux.6` 保留 |
+| `scnet-hpc`（canonical） | `main` / 待同步确认 | Skill、VERSION、发布文档和同步源；当前下游 Desktop 固定 `dsh-scnet@0.6.13`，canonical 版本需以其公开 release 为准 |
+| `dsh-scnet` | `main` / 待同步确认 | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 当前目标版本 `0.6.13` |
+| `codex-scnet-hpc` | `main` / 待同步确认 | canonical Skill 同步后的 Codex skills-only Plugin；版本需与 canonical 发布流程复核 |
+| `deepseek-harness-linux-desktop` | `main` / 待提交 | 上游基线 `dsh-v0.2.1-rc.2`；当前目录为一个最终迁移 diff，旧 30 个主题补丁归档；固定 `dsh-scnet@0.6.13`；公开 release `v0.2.1-rc.2-linux.1`，旧 `v0.2.0-rc.2-linux.6` 保留 |
 | 上游临时验证树 | commit `c048ea2`，tree `5bac441359860fe6ecaa96dd765b9ea42c0fe0ea` | 补丁 `0018`–`0030` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
@@ -159,7 +159,7 @@
 
 ### 2.2 Linux Desktop 补丁 `0018` + `0019`
 
-- 构建时使用固定版本 `dsh-scnet@0.6.10`，记录包版本、完整性和许可证；`0018` 保留为
+- 构建时使用固定版本 `dsh-scnet@0.6.13`，记录包版本、完整性和许可证；`0018` 保留为
   0.6.6 的历史预置，`0019` 更新到 0.6.7，`0020` 完成 0.6.8 切换，`0024` 完成 0.6.9
   切换，`0025` 完成 0.6.10 切换。
 - 将固定包纳入 Desktop 本地 package set，首次启动不运行 pnpm，也不依赖 npm 网络。
@@ -188,7 +188,7 @@ git diff --check
 结果：
 
 - connector 全量测试 `26/26` 通过（包含 callback listener、错误和凭据适配覆盖）。
-- npm `dsh-scnet@0.6.10` package validate 通过，共 55 个文件，生成的 Python 文件为 0。
+- npm `dsh-scnet@0.6.13` package validate 通过，共 55 个文件，生成的 Python 文件为 0。
 - Git whitespace 检查通过。
 
 ### 3.2 Linux Desktop
@@ -206,7 +206,7 @@ git diff --check
 `0021` 的临时上游验证已通过，`0022` 在其基础上补充运行时依赖：
 
 - 新增 SCNet 状态读取、诊断窗口、preload 和静态 renderer 资源。
-- `0026` 在主窗口右下角增加可关闭的状态入口，显示 `dsh-scnet@0.6.10` 和“需要授权”，
+- `0026` 在主窗口右下角增加可关闭的状态入口，显示 `dsh-scnet@0.6.13` 和“需要授权”，
   点击后打开现有本地诊断页；状态读取和打开动作均经过主窗口来源校验。
 - `0027` 在主窗口重新获得焦点时刷新本地状态，并在页面销毁时清理事件监听器；定向测试覆盖
   外部状态变化后的即时刷新。
@@ -237,7 +237,7 @@ git diff --check
 workflow 和新版本发布前 re-verification。脚本不下载 ASAR 工具，而是使用产物自带
 Electron 的 Node 模式读取同一份 `app.asar`，验证：
 
-- package-set 中固定 `dsh-scnet@0.6.10` 的 SHA-512、字节数和 MIT 许可证；
+- package-set 中固定 `dsh-scnet@0.6.13` 的 SHA-512、字节数和 MIT 许可证；
 - archived runtime、runtime descriptor、Bundle、`scnet-hpc` Skill 和 `VERSION` 一致；
 - Bundle 的 55 个文件逐个匹配 runtime descriptor 的 SHA-256 和字节数；
 - `connector/callback.mjs` 存在，且 connector 入口导出 `listenLoopbackCallback`；
@@ -250,8 +250,8 @@ Electron 的 Node 模式读取同一份 `app.asar`，验证：
 - deb：`deepseek-harness-0.2.0-rc.2-linux-amd64.deb`，SHA-256
   `3723dbe924a3f3ffb841e26505f950f4849bc2514a7fabf53d4989f8d4280cd6`；
 - `app.asar` SHA-256：`93b05653868135d06213834bf60068290d9390d40854bafeda3c4c2f6cd99f0f`；
-- `dsh-scnet-0.6.10.tgz` SHA-512：
-  `sha512-d76YwMtAMukGzKewYrUooAaKVkw+Iv80IWhKBqbXMEgScRn8RPtM+N+Zb0ljqrPZgPog/TCheuCSMLIOwoapyg==`；
+- `dsh-scnet-0.6.13.tgz` 的 SHA-512、字节数和许可证由当前 package-set manifest 固定，
+  发布前以 `scnet-release-audit.mjs --expected-version 0.6.13` 的实际输出为准；
 - unpacked app 与 deb 审计均通过；正例扫描 54 个文本文件，0 个敏感发现；
 - 反例 fixture 对 `.pyc` 缓存和带值 `access_token` 均按预期失败；
 - Desktop 定向测试 3 个文件通过，`42 passed / 1 skipped`；
@@ -293,10 +293,10 @@ Run `38221395453` 首次验证暴露干净 Debian 启动缺少 `libasound.so.2`�
 `libasound2`，并在后续 Run `38233720311` 中得到验证。Debian 13 测试镜像另预装
 `libasound2t64`，供离线候选升级解析该运行库。
 
-`0.6.10` 发布从 canonical `scnet-hpc` 开始：canonical release Run `38705899989` 成功；
+历史 `0.6.10` 发布从 canonical `scnet-hpc` 开始：canonical release Run `38705899989` 成功；
 同步检查等待修复后的 Validate / `codex-scnet-hpc` / `dsh-scnet` Run 分别为
-`38708420158`、`38708420096`、`38708420092`，均成功。`dsh-scnet@0.6.10` npm/GitHub
-发布 Run `38706144374` 成功，`codex-scnet-hpc v0.6.10` 发布 Run `38706136304` 成功。
+`38708420158`、`38708420096`、`38708420092`，均成功。该段仅作为历史发布证据，
+当前 Desktop 固定版本已更新为 `0.6.13`，新的同步发布证据仍待补录。
 Desktop push Run `38708184304` 成功，确认 `0025`、Bundle 审计、安装和会话链路。
 
 公开 `.6` 发布前，完整 release-preflight Run `38709921855` 成功：上游 Linux primary
@@ -315,7 +315,8 @@ gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行
 - M0 外部合同尚未冻结，因此不得写入、猜测或硬编码 SCNet 内部 issuer、endpoint、client ID 或 scope。
 - 不得把 access token、refresh token、DeepSeek 凭据、账户标识或内部 endpoint 提交到仓库。
 - OpenAPI 登录状态与 SSH 密钥/集群配置是独立状态，不得静默切换 backend 或互相冒充。
-- Linux 当前只发布 deb，不启用应用内自动更新。
+- Linux 当前只发布 deb；客户端更新入口已在左下角显示，但 deb 仍由系统安装器确认，
+  Harness 核心更新不能单独替换安装目录。
 - 当前交付是离线 connector 骨架和固定 bundle 预置，不得对外宣称 SCNet 登录已完成。
 - 当前诊断页是本地就绪检查，不是 SCNet 登录入口；在 M0 合同和凭证发放前不得把“需要授权”
   改成“已登录”，也不得根据手册示例值打开真实请求。
@@ -356,14 +357,17 @@ gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行
 
 ### P1：完成 Linux Desktop 登录链路
 
-- [ ] 设计双通道更新中心，明确区分：
+- [x] 设计并实现双通道更新中心，明确区分：
   - **桌面客户端更新**：当前客户端/壳版本，例如
     `v0.2.1-rc.2-linux.1`；更新对象是完整 Linux deb/AppImage。
   - **Harness 核心更新**：上游核心 tag，例如 `dsh-v0.2.1-rc.2`；当前核心随
     客户端发行包一起构建和发布，不直接改动用户安装目录中的源代码。
-- [ ] 实现 Linux 左下角更新提示：分别展示客户端版本和 Harness 核心版本；
-  客户端更新可下载并交给系统安装器确认，核心更新在迁移构建完成并发布新的客户端
-  包后随包交付；在 deb 更新通道、签名和回滚策略冻结前，不静默替换系统包。
+- [x] 实现 Linux 左下角更新提示：分别展示客户端版本和 Harness 核心版本。
+  客户端更新继续使用上游 Desktop updater；Harness 核心更新独立检查本仓库公开
+  Release，发现新核心后打开受信任的 Release 页面，提示用户安装包含新核心的完整
+  客户端包。核心不直接替换用户安装目录，也不从 renderer 接收下载 URL。
+- [ ] 为 Linux deb 增加签名、静态 feed、原子安装和回滚后，再把客户端更新从提示升级为
+  应用内下载/系统安装器联动；当前不静默替换系统包。
 - [ ] 接入 Linux Secret Service/Keyring，并验证锁屏、无 keyring、无桌面会话和凭据清理场景。
 - [x] 实现 `dsh://auth/scnet` 离线解析、state 一次性消费和第二次启动参数转发；
   真实 OAuth2 回调接线及 `127.0.0.1` loopback 回退仍待正式合同。
@@ -386,7 +390,7 @@ gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行
 - [x] 验证旧默认 profile 自动迁移、显式禁用跨升级保留、自定义 profile 不被覆盖（Run `38336572137`）。
 - [x] 验证发行包不包含凭据、内部 endpoint、缓存、`__pycache__` 或 `.pyc`。
 - [x] 将完整 deb 验收结果和 draft `.5` release artifact 校验值记录到发布证据中。
-- [x] 按 canonical 源头顺序发布 `0.6.10`，并将公开 `.6` 的 checksum、安装、升级、
+- [x] 按 canonical 源头顺序发布历史 `0.6.10`，并将公开 `.6` 的 checksum、安装、升级、
   `dsh://`、AppArmor、Wayland 和 Desktop session 证据记录到发布交接中。
 
 ### P2：真实沙盒与后续平台

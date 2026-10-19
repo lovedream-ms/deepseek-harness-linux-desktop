@@ -143,8 +143,10 @@ pnpm --dir apps/desktop run package:linux:x64
    走不通时再考虑 AppArmor profile 或 `--no-sandbox`（会降低安全性，仅作兜底）。
 - **bash 沙箱**：Linux 侧走 Landlock（`@deepseek-ai/node-addon-system-linux-*`）。首次运行请确认
   内核 ≥ 5.13，否则沙箱策略会退化，需要按提示调整策略配置。
-- **托盘**：mac 版没有托盘，补丁**不给 Linux 加托盘**（GNOME 下 AppIndicator 也不可靠）；
-  窗口关掉后用菜单/再次启动唤回。
+- **托盘**：Linux 和 Windows 都保留系统托盘入口。Linux 使用随 deb 分发的
+  `tray.png`，关闭最后一个窗口后应用和 Host 继续运行，可从托盘重新显示窗口；
+  显式选择退出才会结束进程。若桌面环境不显示 StatusNotifier 图标，仍可通过再次启动
+  或应用菜单恢复窗口。
 - **自动更新**：官方 feed 只有 `mac-arm64` / `mac-x64` / `win-x64`。Linux deb 不使用应用内自动更新，
   通过发行版包更新流程安装新版本。
   另外 **Linux 下的"强制更新 policy"是惰性的**：共享身份模型与 `x-client-platform`

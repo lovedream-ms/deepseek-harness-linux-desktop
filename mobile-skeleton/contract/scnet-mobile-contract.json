@@ -1,6 +1,6 @@
 {
   "contractVersion": "0.1.0",
-  "sourceBundle": "dsh-scnet@0.6.10",
+  "sourceBundle": "dsh-scnet@0.6.13",
   "status": "offline-skeleton",
   "network": {
     "enabled": false,
