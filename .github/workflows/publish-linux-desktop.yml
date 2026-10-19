@@ -125,7 +125,7 @@ jobs:
           node "$GITHUB_WORKSPACE/ci/scnet-release-audit.mjs" \
             --deb "${debs[0]}" \
             --package-set "apps/desktop/.desktop-build/targets/linux-x64/package-set" \
-            --expected-version 0.6.10 \
+            --expected-version 0.6.13 \
             --output "$GITHUB_WORKSPACE/scnet-release-audit.json"
           sudo apt-get update -q
           sudo apt-get install -yq xvfb openbox xdotool dbus-x11 imagemagick libglib2.0-bin
