@@ -10,15 +10,16 @@
 ### 当前仓库状态
 
 - 当前仓库：`deepseek-harness-linux-desktop`
-- 当前提交：`3d53fb1 chore: migrate Linux port to dsh-v0.2.1-rc.2`
-- `HEAD == origin/main == 3d53fb1`
+- 当前功能提交：`75cfc72 feat: update scnet bundle and linux tray`
+- 当前分支已包含 `dsh-scnet@0.6.13`、Linux 托盘修复和双通道更新中心；推送后的
+  `HEAD == origin/main` 状态需以远端验证为准。
 - 当前 Linux 移植已固化为 **1 个最终迁移 diff**，旧 30 个主题补丁归档在
   `patches-legacy-dsh-v0.2.0-rc.2/`，用于历史追溯。
 - `apply.sh`、本地更新脚本和 `upstream-sync-check` 统一使用 `git apply --3way`，
   直接应用最终迁移差异，避免旧主题补丁在上游变更后的冲突。
-- 迁移补丁在全新 `dsh-v0.2.1-rc.2` 树上以 `git apply --3way` 无冲突应用；
-  `typecheck`、host library build、Linux package preflight、`.deb` 构建和已安装 deb
-  session 均通过（Run `39201850282`）。
+- 迁移补丁在全新 `dsh-v0.2.1-rc.2` 树上以 `git apply --3way` 无冲突应用；本轮
+  `tsc -b tsconfig.host.json tsconfig.client.json`、Desktop 定向测试 `180/180`、
+  `pnpm run build:lib:host` 和 `check:package` 均通过。新的 Linux `.deb` 尚未发布。
 
 ### 最新 CI 证据
 
@@ -51,7 +52,8 @@
 
 ### 当前交接动作
 
-1. 以 `v0.2.1-rc.2-linux.1` 为基线恢复 release-preflight 和上游同步自动化验证。
+1. 以 `v0.2.1-rc.2-linux.1` 为基线重新构建并发布包含 `0.6.13`、托盘修复和更新中心的
+   新 Linux release；发布前恢复 release-preflight 和上游同步自动化验证。
 2. 保持自动迁移默认排除 alpha；只有显式 `--tag` 才允许选择 alpha。
 3. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
    登录、刷新、撤销、账户关联和 OpenAPI 查询为阻塞项。
