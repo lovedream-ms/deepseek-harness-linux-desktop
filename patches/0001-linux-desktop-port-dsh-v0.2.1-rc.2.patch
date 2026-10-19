@@ -2264,10 +2264,10 @@ index e577b1d3fe..d1f2dcd417 100644
    }
  }
 diff --git a/apps/desktop/scripts/desktop-package-environment.d.mts b/apps/desktop/scripts/desktop-package-environment.d.mts
-index 995c117d07..c158004373 100644
+index 995c117d07..8f11f1723b 100644
 --- a/apps/desktop/scripts/desktop-package-environment.d.mts
 +++ b/apps/desktop/scripts/desktop-package-environment.d.mts
-@@ -1,37 +1,27 @@
+@@ -1,37 +1,33 @@
 -/** Select local test defaults or platform release settings without changing the caller's environment. */
 +/** Load platform-local release settings without changing the caller's process environment. */
  
@@ -2293,9 +2293,14 @@ index 995c117d07..c158004373 100644
 +  platform: 'win32' | 'darwin' | 'linux',
    environment?: NodeJS.ProcessEnv,
    appRoot?: string,
--  options?: { unsigned?: boolean, prepareOnly?: boolean },
+   options?: { unsigned?: boolean, prepareOnly?: boolean },
  ): NodeJS.ProcessEnv
  
++/** Select local unsigned macOS defaults without inheriting release credentials. */
++export function localMacOSPackageEnvironment(
++  environment?: NodeJS.ProcessEnv,
++): NodeJS.ProcessEnv
++
  /**
 - * Validate the packaging mode before preparation without invoking a token or Apple's services.
 - * @param environment Selected local defaults or file-owned release settings.
@@ -2308,9 +2313,8 @@ index 995c117d07..c158004373 100644
  export function validateDesktopPackageEnvironment(
    environment: NodeJS.ProcessEnv,
 -  target: { platform: 'win32' | 'darwin', arch: string },
--  options?: { unsigned?: boolean, prepareOnly?: boolean, skipNotarization?: boolean },
 +  target: { platform: 'win32' | 'darwin' | 'linux', arch: string },
-+  options?: { unsigned?: boolean, prepareOnly?: boolean },
+   options?: { unsigned?: boolean, prepareOnly?: boolean, skipNotarization?: boolean },
  ): void
 diff --git a/apps/desktop/scripts/desktop-package-environment.mjs b/apps/desktop/scripts/desktop-package-environment.mjs
 index 8116dea245..47efa9c7b9 100644
@@ -2417,6 +2421,19 @@ index 591147578b..bbf487700c 100644
    const deployment = resolveDesktopAutoUpdateEnvironment(environment)
    const name = deployment === 'test' ? 'DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN' : 'DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN'
    const selected = origin(environment[name], name)
+diff --git a/apps/desktop/scripts/desktop-release-store.ts b/apps/desktop/scripts/desktop-release-store.ts
+index c080272e1d..83ec26c4b9 100644
+--- a/apps/desktop/scripts/desktop-release-store.ts
++++ b/apps/desktop/scripts/desktop-release-store.ts
+@@ -17,7 +17,7 @@ const sourceSchema = z.strictObject({
+   channel: z.enum(['nightly', 'latest']),
+   runnerName: z.string().min(1),
+   // Storage accepts every Desktop target; CI routing separately limits currently provisioned platforms.
+-  target: z.enum(['mac-arm64', 'mac-x64', 'win-x64']),
++  target: z.enum(['mac-arm64', 'mac-x64', 'win-x64', 'linux-x64']),
+   preset: z.enum(['test', 'production']),
+   productVersion: z.string().min(1),
+   version: z.string().min(1),
 diff --git a/apps/desktop/scripts/desktop-toolchain-preflight.ts b/apps/desktop/scripts/desktop-toolchain-preflight.ts
 index ff855cfd09..08c8dc1fca 100644
 --- a/apps/desktop/scripts/desktop-toolchain-preflight.ts
@@ -2439,10 +2456,70 @@ index ff855cfd09..08c8dc1fca 100644
    environment: NodeJS.ProcessEnv = process.env,
  ): Promise<void> {
    const failures = await probeDesktopToolchain(platform, environment)
+diff --git a/apps/desktop/scripts/desktop-upload-plan.ts b/apps/desktop/scripts/desktop-upload-plan.ts
+index aa05966c4a..6e96ac8788 100644
+--- a/apps/desktop/scripts/desktop-upload-plan.ts
++++ b/apps/desktop/scripts/desktop-upload-plan.ts
+@@ -20,6 +20,7 @@ const TARGETS = {
+   'mac-arm64': { platform: 'darwin', arch: 'arm64', os: 'mac' },
+   'mac-x64': { platform: 'darwin', arch: 'x64', os: 'mac' },
+   'win-x64': { platform: 'win32', arch: 'x64', os: 'win' },
++  'linux-x64': { platform: 'linux', arch: 'x64', os: 'linux' },
+ } as const satisfies Record<DesktopPackageTargetName, {
+   readonly platform: NodeJS.Platform
+   readonly arch: string
+@@ -238,7 +239,7 @@ export async function createDesktopUploadPlan(
+   }
+ 
+   const base = `deepseek-harness-${buildVersion}-${target.os}-${target.arch}`
+-  const updaterExtension = target.platform === 'darwin' ? 'zip' : 'exe'
++  const updaterExtension = target.platform === 'darwin' ? 'zip' : target.platform === 'linux' ? 'AppImage' : 'exe'
+   const updaterInfo = updateFileInfo(metadata.files[0], `${metadataFilename}.files[0]`, `${base}.${updaterExtension}`)
+   const updaterPath = await verifyChecksummedArtifact(artifactsRoot, updaterInfo)
+   const artifacts: DesktopUploadArtifact[] = []
+@@ -255,7 +256,7 @@ export async function createDesktopUploadPlan(
+       uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'),
+     )
+   }
+-  else {
++  else if (target.platform === 'win32') {
+     const blockmapPath = await requireArtifact(artifactsRoot, `${base}.exe.blockmap`)
+     installerArtifact = uploadArtifact(
+       updaterPath,
+@@ -265,6 +266,11 @@ export async function createDesktopUploadPlan(
+     artifacts.push(installerArtifact)
+     artifacts.push(uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))
+   }
++  else {
++    const blockmapPath = await requireArtifact(artifactsRoot, `${base}.AppImage.blockmap`)
++    installerArtifact = uploadArtifact(updaterPath, binaryPrefix, 'application/vnd.appimage')
++    artifacts.push(installerArtifact, uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))
++  }
+ 
+   const payloadUrl = `${update.origin}/${binaryPrefix}/${updaterInfo.filename}`
+   const published = {
+@@ -277,7 +283,7 @@ export async function createDesktopUploadPlan(
+     contents: dump(published),
+   }
+   artifacts.push(channelArtifact)
+-  const latestFilename = `dsh-latest-${target.platform === 'darwin' ? 'macos' : 'windows'}-${target.arch}.${target.platform === 'darwin' ? 'dmg' : 'exe'}`
++  const latestFilename = `dsh-latest-${target.platform === 'darwin' ? 'macos' : target.platform === 'linux' ? 'linux' : 'windows'}-${target.arch}.${target.platform === 'darwin' ? 'dmg' : target.platform === 'linux' ? 'AppImage' : 'exe'}`
+   const latestKey = `desktop/${latestFilename}`
+   return {
+     environment: update.environment,
 diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
-index 4b9cd27a8d..24b0822de7 100644
+index 4b9cd27a8d..c97c30775f 100644
 --- a/apps/desktop/scripts/electron-builder-config.mjs
 +++ b/apps/desktop/scripts/electron-builder-config.mjs
+@@ -19,7 +19,7 @@ import {
+   resolveWindowsUpdatePublisher,
+   scrubWindowsSigningEnvironment,
+ } from './windows-sign.mjs'
+-import { resolveDesktopAutoUpdateConfig } from './desktop-auto-update-environment.mjs'
++import { resolveDesktopPackagingUpdateConfig } from './desktop-auto-update-environment.mjs'
+ import { resolveDesktopBuildCommit } from './desktop-build-commit.mjs'
+ import { resolveDesktopBuildVersion } from './desktop-build-version.mjs'
+ import { resolveDesktopPolicyEnvironment } from './desktop-policy-environment.mjs'
 @@ -65,7 +65,9 @@ export function createElectronBuilderConfig(
    if (skipNotarization && (unsigned || resolvedPlatform !== 'darwin')) throw new Error('Skipping notarization requires a signed macOS build')
    const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
@@ -2572,17 +2649,26 @@ index 0000000000..35ec80773d
 +  fi
 +fi
 diff --git a/apps/desktop/scripts/package-target.ts b/apps/desktop/scripts/package-target.ts
-index be2f577e1b..2bd4d9a378 100644
+index be2f577e1b..f39757bb12 100644
 --- a/apps/desktop/scripts/package-target.ts
 +++ b/apps/desktop/scripts/package-target.ts
-@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
+@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util'
+ import { join, resolve } from 'node:path'
  import {
    desktopBuildRecordFilename,
-   resolveDesktopAutoUpdateConfig,
+-  resolveDesktopAutoUpdateConfig,
 +  resolveDesktopPackagingUpdateConfig,
  } from './desktop-auto-update-environment.mjs'
  import { desktopArtifactOutput, desktopTargetBuildPaths } from './desktop-build-paths.mjs'
  import { packageMacOSArtifacts, type DesktopPrepackagedArtifact } from './package-macos.ts'
+@@ -24,6 +24,7 @@ import { suggestDesktopBuildVersion } from './desktop-build-version-discovery.ts
+ import { desktopBuildCommitEnvironment, readDesktopBuildCommit, resolveDesktopBuildCommit } from './desktop-build-commit.mjs'
+ import { requireDesktopToolchain } from './desktop-toolchain-preflight.ts'
+ import { withMacOSNotarizationProxy } from './macos-notarization-proxy.ts'
++import { SCNET_BUNDLE_SPEC } from '../src/scnet-bundle.ts'
+ 
+ const APP_ROOT = resolve(import.meta.dirname, '..')
+ const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
 @@ -47,14 +48,14 @@ const DESKTOP_UPLOAD_CREDENTIAL_ENV_NAMES = new Set([
  const AUTOMATIC_BUILD_VERSION = 'auto'
  
@@ -2635,7 +2721,49 @@ index be2f577e1b..2bd4d9a378 100644
    if (target.platform === 'darwin' && hostPlatform !== 'darwin') {
      throw new Error(`desktop package: ${name} requires a macOS build host`)
    }
-@@ -520,8 +532,10 @@ export async function packageTarget(
+@@ -362,7 +374,9 @@ async function main(): Promise<void> {
+   process.stdout.write(`desktop package: ${target.name} publishes ${buildVersion}${buildVersion === productVersion ? '' : ` for product version ${productVersion}`}\n`)
+   const packaged = readDesktopBuildCommit(REPOSITORY_ROOT)
+   Object.assign(environment, desktopBuildCommitEnvironment(packaged))
+-  const secrets = Object.entries(environment).filter(([name]) => /KEY|SECRET|TOKEN|PASSWORD|APPLE_ID/iu.test(name)).map(([, value]) => value ?? '')
++  const secrets: string[] = Object.entries(environment)
++    .filter(([name]) => /KEY|SECRET|TOKEN|PASSWORD|APPLE_ID/iu.test(name))
++    .map(([, value]) => value ?? '')
+   const run = createPackagingRun(join(APP_ROOT, '.desktop-build', 'packaging-runs'), {
+     target: target.name, unsigned: invocation.unsigned, skipNotarization: invocation.skipNotarization,
+     directory: invocation.directory, prepareOnly: invocation.prepareOnly,
+@@ -482,6 +496,16 @@ export async function packageTarget(
+     '--pack-destination',
+     buildPaths.packedDsh,
+   ], buildEnv, REPOSITORY_ROOT)
++  rmSync(buildPaths.packedScnet, { recursive: true, force: true })
++  mkdirSync(buildPaths.packedScnet, { recursive: true })
++  await execute([
++    'dlx',
++    'npm@12',
++    'pack',
++    SCNET_BUNDLE_SPEC,
++    '--pack-destination',
++    buildPaths.packedScnet,
++  ], buildEnv, REPOSITORY_ROOT)
+   await execute(['run', 'release:pack', '--family', 'vendor', '--out', buildPaths.packedVendor, ...packArguments], buildEnv, REPOSITORY_ROOT)
+   rmSync(buildPaths.packedLandlock, { recursive: true, force: true })
+   mkdirSync(buildPaths.packedLandlock, { recursive: true })
+@@ -493,10 +517,11 @@ export async function packageTarget(
+     '--pack-destination',
+     buildPaths.packedLandlock,
+   ], buildEnv, REPOSITORY_ROOT)
+-  await execute(['run', 'prepare:runtime', ...(signPrimaryRuntime ? ['--defer-primary-runtime-smoke'] : [])], downloadEnv)
++  const deferLinuxSmoke = target.platform === 'linux'
++  await execute(['run', 'prepare:runtime', ...(signPrimaryRuntime || deferLinuxSmoke ? ['--defer-primary-runtime-smoke'] : [])], downloadEnv)
+   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime'], electronBuilderEnv)
+   await execute(['run', 'prepare:packages'], targetEnv)
+-  await execute(['run', 'prepare:dsh', ...(signPrimaryRuntime ? ['--defer-runtime-smoke'] : [])], downloadEnv)
++  await execute(['run', 'prepare:dsh', ...(signPrimaryRuntime || deferLinuxSmoke ? ['--defer-runtime-smoke'] : [])], downloadEnv)
+   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime', '--dsh'], electronBuilderEnv)
+   if (invocation.prepareOnly) return
+   if (target.platform === 'darwin' && !invocation.unsigned && !invocation.skipNotarization && !invocation.directory) {
+@@ -520,8 +545,10 @@ export async function packageTarget(
        () => notarizeMacOS({ appPath, ...resolveMacOSNotarizationEnvironment(environment) }), undefined, undefined, proxyEvent)
    } else {
      await signedStage('artifacts', () => execute(desktopElectronBuilderArguments(target, invocation.directory), electronBuilderEnv))
@@ -2776,6 +2904,39 @@ index ba92fef0e6..d82d1f854c 100644
    return execFileSync(executable, ['-p', 'process.versions.node'], {
      encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
    }).trim()
+diff --git a/apps/desktop/scripts/retain-desktop-ci.ts b/apps/desktop/scripts/retain-desktop-ci.ts
+index 69bade9712..7f96eb1909 100644
+--- a/apps/desktop/scripts/retain-desktop-ci.ts
++++ b/apps/desktop/scripts/retain-desktop-ci.ts
+@@ -35,13 +35,15 @@ export function desktopReleasesRoot(env: NodeJS.ProcessEnv): string {
+ export async function retainDesktopCi(env: NodeJS.ProcessEnv, appRoot = resolve(import.meta.dirname, '..')): Promise<string> {
+   const target = resolveDesktopBuildTarget(env)
+   const windows = target === 'win-x64'
+-  const platform = windows ? 'win32' : 'darwin'
++  const linux = target === 'linux-x64'
++  const platform = windows ? 'win32' : linux ? 'linux' : 'darwin'
+   const settings = loadDesktopPackageEnvironment(platform, env, appRoot, { unsigned: true })
+   const preset = settings.DSH_PACKAGING_PRESET
+   if (preset !== 'test' && preset !== 'production') throw new Error('desktop retention: a machine preset is required')
+   if (windows && !['signed', 'unsigned'].includes(env.PACKAGE_SIGNING ?? '')) throw new Error('desktop retention: invalid signing selection')
+-  if (!windows && !['true', 'false'].includes(env.PACKAGE_SKIP_NOTARIZATION ?? '')) throw new Error('desktop retention: invalid notarization selection')
++  if (!windows && !linux && !['true', 'false'].includes(env.PACKAGE_SKIP_NOTARIZATION ?? '')) throw new Error('desktop retention: invalid notarization selection')
+   const qualification = windows ? (env.PACKAGE_SIGNING === 'signed' ? 'signed' : 'unsigned')
++    : linux ? 'unsigned'
+     : (env.PACKAGE_SKIP_NOTARIZATION === 'true' ? 'unnotarized' : 'notarized')
+   const product: { version: string } = JSON.parse(await readFile(join(appRoot, 'package.json'), 'utf8'))
+   const version = validateDesktopBuildVersion(required(env, 'PACKAGE_VERSION'), product.version)
+@@ -61,7 +63,9 @@ export async function retainDesktopCi(env: NodeJS.ProcessEnv, appRoot = resolve(
+     ? join(paths.root, mode) : join(appRoot, '.desktop-build', 'targets', target, mode)
+   const base = `deepseek-harness-${version}-${windows ? 'win-x64' : target}`
+   const debugSuffix = qualification === 'unnotarized' ? '-unnotarized' : qualification === 'unsigned' ? '-unsigned' : ''
+-  const names = windows ? [`${base}${debugSuffix}.exe`] : [`${base}${debugSuffix}.dmg`, `${base}${debugSuffix}.zip`]
++  const names = windows ? [`${base}${debugSuffix}.exe`] : linux
++    ? [`${base}${debugSuffix}.AppImage`]
++    : [`${base}${debugSuffix}.dmg`, `${base}${debugSuffix}.zip`]
+   if (qualification === 'signed' || qualification === 'notarized') {
+     names.push(`${base}.${windows ? 'exe' : 'zip'}.blockmap`, desktopBuildRecordFilename(target), desktopUpdateMetadataFilename(version, platform, source.channel))
+   }
 diff --git a/apps/desktop/src/command-installation.ts b/apps/desktop/src/command-installation.ts
 index 3e181ae984..837c426e83 100644
 --- a/apps/desktop/src/command-installation.ts
@@ -3043,11 +3204,30 @@ index 5d9d4607c7..9f12746cb3 100644
    restartAppHostMenu: '重启应用与 Host',
    updateCheckFailedTitle: '更新检查失败',
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..e695f7b841 100644
+index 2afdfd7194..15310cd400 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -1303,7 +1303,7 @@ async function main(): Promise<void> {
-     if (!['win32', 'darwin'].includes(process.platform) || !['x64', 'arm64'].includes(process.arch)) throw new Error('desktop policy: unsupported platform')
+@@ -1294,16 +1294,24 @@ async function main(): Promise<void> {
+     ? ('dshMandatoryUpdatePolicy' in manifest ? manifest.dshMandatoryUpdatePolicy : undefined)
+     : developmentPolicy === undefined ? undefined : JSON.parse(developmentPolicy) as unknown
+   const policyConfig = resolveDesktopPolicyConfig(policyInput, !app.isPackaged)
+-  if (policyConfig !== undefined) {
++  // Mandatory policy feeds currently publish Windows and macOS identities only. Linux
++  // builds keep the ordinary update channel, but do not initialize that policy client.
++  const policyPlatform = process.platform === 'win32' || process.platform === 'darwin' ? process.platform : undefined
++  if (policyConfig !== undefined && !['x64', 'arm64'].includes(process.arch)) {
++    throw new Error('desktop policy: unsupported architecture')
++  }
++  if (policyConfig !== undefined && policyPlatform === undefined && process.platform !== 'linux') {
++    throw new Error('desktop policy: unsupported platform')
++  }
++  if (policyConfig !== undefined && policyPlatform !== undefined) {
+     if (policyConfig.authentication === 'feishu-test') {
+       policyAuth = new DesktopPolicyTestAuth(policyConfig.origin, policyConfig.allowedAuthOrigins, locale,
+         () => mandatoryUI?.confirmationWindow ?? currentDialogWindow(),
+         (event) => { console.info(`desktop policy authentication: ${event}`); updateJournal?.action(`policy-login-${event}`) })
+     }
+-    if (!['win32', 'darwin'].includes(process.platform) || !['x64', 'arm64'].includes(process.arch)) throw new Error('desktop policy: unsupported platform')
      let wasBlocking = false
      mandatoryPolicy = new DesktopMandatoryUpdatePolicy(policyConfig, {
 -      platform: process.platform as 'win32' | 'darwin', arch: process.arch as 'x64' | 'arm64',
