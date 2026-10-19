@@ -306,7 +306,11 @@ jobs:
           test -L '/usr/bin/DeepSeek Harness'
           # The current candidate keeps the upstream app version while changing the patched
           # runtime, so force a local reinstall to execute its maintainer scripts.
-          sudo apt-get install -y --reinstall "./${candidate[0]}"
+          # The candidate may intentionally reuse the upstream application version while
+          # replacing the patched runtime. Allow the local package version to be lower than
+          # the published build so this remains a forced runtime reinstall rather than a
+          # Debian version-order test.
+          sudo apt-get install -y --allow-downgrades --reinstall "./${candidate[0]}"
           test ! -e '/usr/bin/DeepSeek Harness'
           test -x /usr/bin/deepseek-harness
           echo "CANDIDATE-UPGRADE: package replacement and legacy launcher cleanup passed"
