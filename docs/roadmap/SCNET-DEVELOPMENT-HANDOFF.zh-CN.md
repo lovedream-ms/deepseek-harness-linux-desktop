@@ -1,6 +1,6 @@
 # SCNet 开发交接与后续 TODO
 
-- 交接日期：2026-10-16
+- 交接日期：2026-10-19
 - 当前状态：`in progress`
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
@@ -10,23 +10,24 @@
 ### 当前仓库状态
 
 - 当前仓库：`deepseek-harness-linux-desktop`
-- 当前提交：迁移提交待推送；目标基线为上游 tag `dsh-v0.2.1-rc.2`。
+- 当前提交：`3d53fb1 chore: migrate Linux port to dsh-v0.2.1-rc.2`
+- `HEAD == origin/main == 3d53fb1`
 - 当前 Linux 移植已固化为 **1 个最终迁移 diff**，旧 30 个主题补丁归档在
   `patches-legacy-dsh-v0.2.0-rc.2/`，用于历史追溯。
 - `apply.sh`、本地更新脚本和 `upstream-sync-check` 统一使用 `git apply --3way`，
   直接应用最终迁移差异，避免旧主题补丁在上游变更后的冲突。
-- 新增的 `0030` 仅修复测试隔离：目录选择器 preload 集成测试现在 mock 与其无关的
-  `preload-scnet-status`，避免把 `dsh-desktop:scnet-status` IPC 调用计入目录选择断言。
+- 迁移补丁在全新 `dsh-v0.2.1-rc.2` 树上以 `git apply --3way` 无冲突应用；
+  `typecheck`、Linux package preflight 和 `.deb` 构建均通过。
 
 ### 最新 CI 证据
 
-- Push 基础验证 Run `38883088897`（`a5472f7`）：**success**。
+- Push 基础验证 Run `38883088897`（旧提交 `a5472f7`）：**success**，作为旧补丁线的历史证据。
   - 上游 `dsh-v0.2.1-rc.2` 迁移差异应用
   - repository typecheck
   - Desktop build
   - deb 构建、安装和桌面会话
-- 完整 release-preflight Run `38884586418`（`a5472f7`）：截至交接时仍为
-  **in progress**。
+- 完整 release-preflight Run `38884586418`（旧提交 `a5472f7`）是迁移前的历史运行记录，
+  不作为本次 0.2.1 RC 发布的唯一依据。
   - 已通过：公开 `.6` checksum、安装和桌面会话；`.4 → 当前候选` 升级；
     AppArmor hardened launch；Wayland；Debian 13 离线安装/升级/卸载；
     default、disabled、custom profile 迁移；当前候选构建和基础会话。
@@ -40,15 +41,15 @@
   - web browser snapshot 的 steering replay 失败未在本地复现，属于独立的上游 web
     replay/session 环境问题；本地干净树缺少 web dist，构建还被上游缺失的
     `@deepseek-ai/dsh-experimental-webworker-runtime/worker` 依赖阻塞。
-- 当前优先发布新的 `v0.2.1-rc.2-linux.1`；旧 `v0.2.0-rc.2-linux.6` 保留不覆盖。
+- 已发布 `v0.2.1-rc.2-linux.1`，旧 `v0.2.0-rc.2-linux.6` 保留未覆盖。
+  新包 SHA-256 为
+  `6b9fc27a5ba85c55020b2487584d6fe7dd85d7b782af8a0411d32c968e5d7d00`。
 
 ### 当前交接动作
 
-1. 完成 `dsh-v0.2.1-rc.2` Linux 迁移、deb 构建和发布验证；后续 TODO 顺延。
-2. 若该 run 只剩 workflow 已声明的 3 个 coverage 竞态，记录其精确失败列表并确认
-   workflow 的容忍条件确实只匹配这 3 项；不要扩大容忍规则。
-3. 发布后再恢复 release-preflight、上游门禁和后续 OAuth2/API 工作。
-4. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
+1. 以 `v0.2.1-rc.2-linux.1` 为基线恢复 release-preflight 和上游同步自动化验证。
+2. 保持自动迁移默认排除 alpha；只有显式 `--tag` 才允许选择 alpha。
+3. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
    登录、刷新、撤销、账户关联和 OpenAPI 查询为阻塞项。
 
 ## 0. 当前总体进度
@@ -88,6 +89,8 @@
   已按源头顺序发布/同步到 `0.6.10`
 - [x] 公开 `v0.2.0-rc.2-linux.6` 发布与发布字节复验（预检 Run `38709921855`，
   发布 Run `38729878217`，验证 Run `38731899365`）
+- [x] 上游 `dsh-v0.2.1-rc.2` Linux 迁移、deb 构建和公开
+  `v0.2.1-rc.2-linux.1` 发布；发布资产 SHA-256 已复验
 
 ### M2：OAuth2 / Connector
 
@@ -126,7 +129,7 @@
 | `scnet-hpc`（canonical） | `main` / `23e31ae`（release commit `c7dfbe2`） | Skill、VERSION、发布文档和同步源；版本 `0.6.10`，GitHub release `v0.6.10`；后续提交修复下游同步检查等待竞态 |
 | `dsh-scnet` | `main` / `0619310` | canonical Skill 同步后的 DSH Bundle、connector contract、OAuth2 + PKCE 离线协议骨架、结构化错误、一次性回调会话、loopback callback listener、凭据存储适配器和受控 Python 解释器路径注入；npm/GitHub 版本 `0.6.10` |
 | `codex-scnet-hpc` | `main` / `6ea11f3` | canonical Skill 同步后的 Codex skills-only Plugin；GitHub release `v0.6.10` |
-| `deepseek-harness-linux-desktop` | `main` / `72e55b0`（代码验证提交为 `a5472f7`） | 补丁 `0018` 预置 `0.6.6`，`0019` 更新到 `0.6.7`，`0020` 更新到 `0.6.8`，`0021` 增加用户可见的 SCNet 本地诊断页，`0022` 声明 Electron 的 ALSA 运行时依赖，`0023` 修复 Linux release gate 的 lint/翻译配对问题，`0024` 更新到 `0.6.9`，`0025` 更新到源头已发布的 `0.6.10`，`0026` 在主窗口增加可关闭的 SCNet 状态入口，`0027` 在主窗口重新获得焦点时刷新本地状态，`0028` 增加 Linux Secret Service 适配器，`0029` 增加离线 `dsh://auth/scnet` 回调骨架，`0030` 修复目录选择器测试隔离；公开 release `v0.2.0-rc.2-linux.6`，默认激活并保留用户显式禁用状态 |
+| `deepseek-harness-linux-desktop` | `main` / `3d53fb1` | 上游基线 `dsh-v0.2.1-rc.2`；当前目录为一个最终迁移 diff，旧 30 个主题补丁归档；固定 `dsh-scnet@0.6.10`；公开 release `v0.2.1-rc.2-linux.1`，旧 `v0.2.0-rc.2-linux.6` 保留 |
 | 上游临时验证树 | commit `c048ea2`，tree `5bac441359860fe6ecaa96dd765b9ea42c0fe0ea` | 补丁 `0018`–`0030` 应用后的上游提交，仅用于补丁生成和验证，不是独立发布源；未创建新 release |
 
 ## 2. 已完成内容
@@ -345,6 +348,9 @@ gate、Landlock、bwrap、keyless agent smoke、包会话和 Debian 13 多发行
 
 ### P1：完成 Linux Desktop 登录链路
 
+- [ ] 设计并实现 Linux 左下角“检查更新/有新版本”入口：先接只读版本检查和
+  Release 资产展示，确认用户后再调用发行版安装流程；在 deb 更新通道、签名和回滚
+  策略冻结前，不在应用内静默替换系统包。
 - [ ] 接入 Linux Secret Service/Keyring，并验证锁屏、无 keyring、无桌面会话和凭据清理场景。
 - [x] 实现 `dsh://auth/scnet` 离线解析、state 一次性消费和第二次启动参数转发；
   真实 OAuth2 回调接线及 `127.0.0.1` loopback 回退仍待正式合同。
