@@ -2,7 +2,8 @@ name: Check upstream Harness sync
 
 # Detect upstream tags that are newer than the Linux port's pinned base, then
 # check whether the current patch series still applies and builds a Linux deb.
-# This workflow reports compatibility; it never changes BASE_TAG or publishes.
+# This workflow validates compatibility and, when the patch series applies cleanly,
+# opens a reviewable base-tag migration PR. It never publishes a release.
 
 on:
   schedule:
@@ -15,11 +16,12 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 env:
   UPSTREAM_REPO: https://github.com/deepseek-ai/deepseek-harness.git
-  CURRENT_BASE_TAG: dsh-v0.2.0-rc.2
+  CURRENT_BASE_TAG: dsh-v0.2.1-rc.2
   UPSTREAM_DIR: ${{ github.workspace }}/upstream
 
 jobs:
@@ -48,7 +50,7 @@ jobs:
             tag=$REQUESTED_TAG
           else
             tag=$(git ls-remote --tags --refs "$UPSTREAM_REPO" 'dsh-v*' \
-              | awk '{sub("refs/tags/", "", $2); print $2}' \
+              | awk '$2 !~ /-alpha([.-]|$)/ {sub("refs/tags/", "", $2); print $2}' \
               | sort -V | tail -n1)
           fi
           if [ -z "$tag" ]; then
@@ -111,7 +113,11 @@ jobs:
       - name: Clone the candidate upstream tag
         if: steps.compare.outputs.newer == 'true'
         run: |
-          git clone --branch "$UPSTREAM_TAG" --depth 1 "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+          git clone --no-checkout "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+          git -C "$UPSTREAM_DIR" fetch --quiet origin \
+            "refs/tags/$CURRENT_BASE_TAG:refs/tags/$CURRENT_BASE_TAG" \
+            "refs/tags/$UPSTREAM_TAG:refs/tags/$UPSTREAM_TAG"
+          git -C "$UPSTREAM_DIR" checkout -b linux-desktop-sync "$UPSTREAM_TAG"
 
       - name: Apply the Linux patch series
         id: apply
@@ -119,9 +125,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          git -C "$UPSTREAM_DIR" checkout -b linux-desktop-sync
-          git -C "$UPSTREAM_DIR" -c user.name=sync-check -c user.email=sync-check@localhost \
-            am "$GITHUB_WORKSPACE"/patches/*.patch 2>&1 | tee patch-apply.log
+          git -C "$UPSTREAM_DIR" apply --3way "$GITHUB_WORKSPACE"/patches/*.patch 2>&1 | tee patch-apply.log
 
       - name: Install dependencies and build the Linux deb
         id: build
@@ -139,6 +143,53 @@ jobs:
           pnpm --dir apps/desktop run check:package 2>&1 | tee "$GITHUB_WORKSPACE/package-preflight.log"
           pnpm --dir apps/desktop run package:linux:x64 2>&1 | tee "$GITHUB_WORKSPACE/package.log"
           ls -lh apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
+
+      - name: Open an upstream base migration PR
+        if: steps.compare.outputs.newer == 'true' && steps.apply.outcome == 'success' && steps.build.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          CURRENT_BASE_TAG: ${{ env.CURRENT_BASE_TAG }}
+        run: |
+          set -euo pipefail
+          branch="automation/upstream-${UPSTREAM_TAG#dsh-}"
+          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq 'length' | grep -q '^0$'; then
+            git fetch origin main
+            git switch -c "$branch" origin/main
+            for file in \
+              apply.sh \
+              .github/workflows/linux-desktop-verify.yml \
+              .github/workflows/publish-linux-desktop.yml \
+              .github/workflows/upstream-sync-check.yml
+            do
+              perl -0pi -e "s/\Q$CURRENT_BASE_TAG\E/$UPSTREAM_TAG/g" "$file"
+            done
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apply.sh .github/workflows
+            git commit -m "chore: migrate Linux patch base to $UPSTREAM_TAG"
+            git push --set-upstream origin "$branch"
+            cat > migration-pr.md <<EOF
+          ## Upstream Harness migration
+
+          The scheduled sync check applied the Linux patch series with \`git am --3way\`
+          and built a Linux deb successfully against \`$UPSTREAM_TAG\`.
+
+          This PR updates the pinned base tag used by the patch application and
+          verification workflows. It does not publish a release.
+
+          - Previous base: \`$CURRENT_BASE_TAG\`
+          - Candidate base: \`$UPSTREAM_TAG\`
+          - Patch application: success
+          - Linux deb build: success
+          - Sync workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+              --draft --title "chore: migrate Linux patch base to $UPSTREAM_TAG" \
+              --body-file migration-pr.md
+          else
+            echo "An open migration PR already exists for $branch; leaving it unchanged."
+          fi
 
       - name: Write sync report
         if: always()
@@ -161,7 +212,7 @@ jobs:
             echo "- Repository commit: `$GITHUB_SHA`"
             echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo
-            echo "This check does not update the pinned base or publish a release. Review changes and real Ubuntu/Debian desktop behaviour before updating the base."
+            echo "This check does not update main or publish a release. A clean result opens a reviewable migration PR; conflicts remain report-only."
           } > upstream-sync-report.md
 
       - uses: actions/upload-artifact@v4

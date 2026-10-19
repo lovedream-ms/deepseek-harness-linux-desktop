@@ -30,7 +30,7 @@ permissions:
 env:
   UPSTREAM_DIR: ${{ github.workspace }}/upstream
   # Upstream tag the patch series is based on; apply.sh reads the same default.
-  BASE_TAG: dsh-v0.2.0-rc.2
+  BASE_TAG: dsh-v0.2.1-rc.2
   RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:

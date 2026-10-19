@@ -2,7 +2,8 @@
 
 > 本文档对应的 Linux x64 路径已在本机实际编译、打包并启动验证，发布产物为 deb。
 > 另在 **ubuntu-24.04 与 Debian 13（trixie）** 的 GitHub Actions（workflow
-> `Linux desktop verification`）上完整跑通。当前仓库的补丁序列为 **21 个补丁**；
+> `Linux desktop verification`）上完整跑通。当前仓库已固化为 **1 个最终迁移 diff**；
+> 旧的 30 个主题补丁保存在 `patches-legacy-dsh-v0.2.0-rc.2/` 供追溯；
 > 下述 run 是历史验证记录，完整门禁集
 > （run `37411910000`，2026-10-06，head `d70585e`）：8 个 job 中 7 个绿，涵盖
 > `install + typecheck + package preflight`、打包、Debian 13、deb 升级路径与硬化启动、
@@ -12,7 +13,7 @@
 > `pnpm run typecheck` → 应用构建 → `check:package` → `package:linux:x64:dir` →
 > 产物体检 → 无头 runtime 冒烟 → Xvfb GUI 冒烟 → deb。
 
-> 基线：上游 `deepseek-ai/deepseek-harness` tag **`dsh-v0.2.0-rc.2`**（commit `639ed0153972`）。
+> 当前基线：上游 `deepseek-ai/deepseek-harness` tag **`dsh-v0.2.1-rc.2`**。
 > 目标：在 Linux x64 上得到与 macOS 版**行为一致**的 Electron 桌面壳，产物为 deb。
 > 性质：非官方补丁集。上游 README 明确写有 “Linux is not a supported Desktop release target”，
 > 且打包脚本的测试断言 `linux-x64` 必须被拒绝 —— 本补丁集就是把这层限制打开并把 Linux 路径补齐。
@@ -41,20 +42,49 @@
 ```sh
 git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
-git checkout dsh-v0.2.0-rc.2
+git checkout dsh-v0.2.1-rc.2
 git checkout -b linux-desktop
-git am /path/to/patches/*.patch        # 顺序即文件名顺序
+git apply --3way /path/to/patches/*.patch
 cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # 打包必需，先按默认值即可
 pnpm install --frozen-lockfile
 ```
 
-> 随补丁集附带的 `apply.sh` 把上面几步（克隆、切分支、`git am`、生成 `.env.linux`）一次做完：
+> 随补丁集附带的 `apply.sh` 把上面几步（克隆、切分支、`git apply --3way`、生成 `.env.linux`）一次做完：
 > `./apply.sh [目标目录]`；加 `--install` 会在最后执行 `pnpm install --frozen-lockfile`。
 > 它只准备源码树，**不会**编译或打包。
 
-> 若某个 patch 因上游改动冲突：`git am --show-current-patch=diff` 看上下文，
-> 手工合入后 `git add <路径> && git am --continue`。补丁只触及 `apps/desktop/`、
-> 根 `scripts/` 与少数 `packages/` 文件，冲突面很小。
+> 若补丁因上游改动冲突，脚本会保留 checkout 并停止；用 `git status` 检查冲突，
+> 手工合入后 `git add <路径>`，再重新运行后续构建步骤。补丁只触及 `apps/desktop/`、
+> 根 `scripts/` 与少数 `packages/` 文件。
+
+### 自动迁移上游核心并构建
+
+要让本机自动跟随上游并构建 Linux 核心，可运行：
+
+```sh
+./ci/update-upstream-and-build.sh
+```
+
+脚本会解析最新的非 alpha `dsh-v*` tag（自动排除 `-alpha.N`；手动 `--tag` 可指定任意 tag），获取补丁基线对象后执行 `git apply --3way`，
+再运行依赖安装、typecheck、Linux package preflight 和 `.deb` 构建。构建通过后，
+加上 `--install` 才会安装到当前机器：
+
+```sh
+./ci/update-upstream-and-build.sh --install
+```
+
+也可以固定上游版本并指定 Linux 构建版本：
+
+```sh
+./ci/update-upstream-and-build.sh \
+  --tag dsh-v0.2.1-rc.2 \
+  --build-version 0.2.1-rc.2-linux.1 \
+  --keep
+```
+
+如果补丁与上游发生语义冲突，脚本会保留迁移中的 checkout 并停止，不会安装半成品；
+解决冲突后重新运行构建步骤。GitHub Actions 的
+`upstream-sync-check` 会定时执行相同的迁移和构建，并在成功时自动创建基线迁移 PR。
 
 ## 3. 打包
 

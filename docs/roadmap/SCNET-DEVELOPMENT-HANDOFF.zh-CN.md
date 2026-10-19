@@ -5,22 +5,23 @@
 - 关联仓库：`deepseek-harness-linux-desktop`、`dsh-scnet`
 - 计划依据：[`SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md`](SCNET-PLATFORM-DEVELOPMENT-PLAN.zh-CN.md)
 
-## 0.1 2026-10-16 最新交接快照
+## 0.1 2026-10-19 最新交接快照
 
 ### 当前仓库状态
 
 - 当前仓库：`deepseek-harness-linux-desktop`
-- 当前提交：`72e55b0 docs: refresh SCNet development handoff`
-- `HEAD == origin/main == 72e55b0`
-- 工作树干净；当前显示为 detached `HEAD`，不代表与 `origin/main` 不同步。
-- 当前补丁序列为 **30 个补丁**，基线仍为上游 tag `dsh-v0.2.0-rc.2`。
+- 当前提交：迁移提交待推送；目标基线为上游 tag `dsh-v0.2.1-rc.2`。
+- 当前 Linux 移植已固化为 **1 个最终迁移 diff**，旧 30 个主题补丁归档在
+  `patches-legacy-dsh-v0.2.0-rc.2/`，用于历史追溯。
+- `apply.sh`、本地更新脚本和 `upstream-sync-check` 统一使用 `git apply --3way`，
+  直接应用最终迁移差异，避免旧主题补丁在上游变更后的冲突。
 - 新增的 `0030` 仅修复测试隔离：目录选择器 preload 集成测试现在 mock 与其无关的
   `preload-scnet-status`，避免把 `dsh-desktop:scnet-status` IPC 调用计入目录选择断言。
 
 ### 最新 CI 证据
 
 - Push 基础验证 Run `38883088897`（`a5472f7`）：**success**。
-  - 30 个补丁完整回放
+  - 上游 `dsh-v0.2.1-rc.2` 迁移差异应用
   - repository typecheck
   - Desktop build
   - deb 构建、安装和桌面会话
@@ -39,17 +40,14 @@
   - web browser snapshot 的 steering replay 失败未在本地复现，属于独立的上游 web
     replay/session 环境问题；本地干净树缺少 web dist，构建还被上游缺失的
     `@deepseek-ai/dsh-experimental-webworker-runtime/worker` 依赖阻塞。
-- 因 `38884586418` 尚未完成，**当前仍不得创建或发布 `.7` release**。
+- 当前优先发布新的 `v0.2.1-rc.2-linux.1`；旧 `v0.2.0-rc.2-linux.6` 保留不覆盖。
 
 ### 当前交接动作
 
-1. 等待 Run `38884586418` 完成，并检查 `linux-gates.log`；只有 upstream gate、
-   web snapshot、sandbox 和 keyless 全部有明确结果，才能形成新的 release-preflight
-   证据。
+1. 完成 `dsh-v0.2.1-rc.2` Linux 迁移、deb 构建和发布验证；后续 TODO 顺延。
 2. 若该 run 只剩 workflow 已声明的 3 个 coverage 竞态，记录其精确失败列表并确认
    workflow 的容忍条件确实只匹配这 3 项；不要扩大容忍规则。
-3. 若完整 preflight 成功，再由用户明确决定是否触发
-   `.github/workflows/publish-linux-desktop.yml` 创建 draft `.7`；不要自动发布。
+3. 发布后再恢复 release-preflight、上游门禁和后续 OAuth2/API 工作。
 4. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
    登录、刷新、撤销、账户关联和 OpenAPI 查询为阻塞项。
 

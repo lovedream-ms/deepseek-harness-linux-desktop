@@ -10,7 +10,7 @@
 set -eu
 
 PATCH_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/patches" && pwd -P)
-BASE_TAG=${BASE_TAG:-dsh-v0.2.0-rc.2}
+BASE_TAG=${BASE_TAG:-dsh-v0.2.1-rc.2}
 BRANCH=${BRANCH:-linux-desktop}
 UPSTREAM=${UPSTREAM:-https://github.com/deepseek-ai/deepseek-harness.git}
 
@@ -50,16 +50,8 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != "$BRANCH" ]; then
 fi
 echo "==> 工作分支 ${BRANCH}，HEAD $(git rev-parse --short HEAD)"
 
-# --- 打补丁（git am 需要提交身份；缺失时用一次性身份，不动你的全局配置）------
-AM='git am'
-if [ -z "$(git config user.email || true)" ] || [ -z "$(git config user.name || true)" ]; then
-  echo "==> 检测到未配置 git 提交身份，本次 git am 使用一次性身份（不写入你的 git 配置）"
-  AM='git -c user.name=linux-port -c user.email=linux-port@localhost am'
-fi
-
 echo "==> 应用补丁：$(ls -1 "$PATCH_DIR"/*.patch | wc -l | tr -d ' ') 个"
-# shellcheck disable=SC2086 # $AM 需要按空格拆成"git -c … am"
-$AM "$PATCH_DIR"/*.patch
+git apply --3way "$PATCH_DIR"/*.patch
 
 # --- 生成打包必需的本地环境文件 ----------------------------------------------
 # loadDesktopPackageEnvironment() 读不到 apps/desktop/.env.linux 会直接报错，

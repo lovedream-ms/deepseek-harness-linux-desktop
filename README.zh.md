@@ -8,9 +8,9 @@ macOS 版保持一致的非官方补丁集。
 上游只发布 macOS 与 Windows —— 其 `apps/desktop/README.md` 明确写着 Linux 不是受支持的桌面
 发布目标，打包测试也断言 `linux-x64` 目标必须被拒绝。本仓库就是把这层限制打开的那组 diff。
 
-> **状态：Linux x64 已在 GitHub Actions 的 Ubuntu 24.04 LTS 与 Debian 13（trixie）上验证通过，本机亦通过。** 既有 Linux 发布链路已在 Ubuntu 24.04 x86_64 上完成编译、打包与冒烟，deb 安装链路也在 Debian 13 容器里跑通。二十九个补丁可干净应用到上游 tag；SCNet 预置 Bundle 补丁已通过类型检查和针对性 Desktop 测试。Linux 发行包使用 deb。`patches/0009`–`0012` 修复了首次 Linux 验证发现的类型错误、dsh 启动器 payload 路径、上传计划报错信息以及上游门禁拒绝的风格与仓库引用；`patches/0018` 预置 `dsh-scnet@0.6.6`，`patches/0019` 更新到 `0.6.7`，`patches/0020` 更新到 `dsh-scnet@0.6.8` 并配套 connector 会话和错误合同，`patches/0021` 为 Desktop 菜单增加本地只读 SCNet 诊断页，`patches/0022` 声明 Electron 在干净 Debian/Ubuntu 安装中需要的 ALSA 运行时依赖，`patches/0023` 修复补丁自身触发的 Linux 门禁 lint 和翻译配对失败，`patches/0024` 更新到 `dsh-scnet@0.6.9`，`patches/0025` 更新到带协议无关 loopback 回调监听器的已发布 `dsh-scnet@0.6.10`，`patches/0026` 在主窗口增加可关闭的 SCNet 状态入口，`patches/0027` 在窗口重新获得焦点时刷新本地状态并在页面销毁时清理监听器，`patches/0028` 增加 Linux Secret Service 适配器和离线测试，`patches/0029` 增加严格的离线 `dsh://auth/scnet` 回调解析和一次性 state 路由，不新增凭证、网络 endpoint 或登录接线。
+> **状态：Linux x64 已迁移到上游 `dsh-v0.2.1-rc.2`，并已完成本机 typecheck、Linux package preflight 与 deb 构建。** 当前发布产物使用一个最终迁移 diff；旧 30 个主题补丁保存在归档目录中。Linux 发行包使用 deb；SCNet Bundle 固定为 `dsh-scnet@0.6.10`。
 
-基线：上游 tag **`dsh-v0.2.0-rc.2`**（commit `639ed0153972`），29 个补丁。
+基线：上游 tag **`dsh-v0.2.1-rc.2`**，当前补丁目录为一个最终迁移 diff。
 
 ---
 
