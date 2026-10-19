@@ -159,7 +159,9 @@ jobs:
 
       - name: Build the desktop application
         working-directory: ${{ env.UPSTREAM_DIR }}
-        run: pnpm --dir apps/desktop run build
+        run: |
+          pnpm run build:lib:host
+          pnpm --dir apps/desktop run build
 
       - name: Packaging preflight (validates .env.linux and the toolchain)
         working-directory: ${{ env.UPSTREAM_DIR }}

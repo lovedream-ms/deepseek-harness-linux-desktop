@@ -88,6 +88,7 @@ jobs:
         working-directory: ${{ env.UPSTREAM_DIR }}
         run: |
           set -euo pipefail
+          pnpm run build:lib:host
           pnpm --dir apps/desktop run package:linux:x64 2>&1 | tee package.log
           ART="apps/desktop/.desktop-build/targets/linux-x64/artifacts"
           ls -l "$ART"/*.deb

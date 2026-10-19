@@ -140,6 +140,7 @@ jobs:
           cp apps/desktop/.env.linux.example apps/desktop/.env.linux
           pnpm install --frozen-lockfile 2>&1 | tee "$GITHUB_WORKSPACE/dependencies.log"
           pnpm run typecheck 2>&1 | tee "$GITHUB_WORKSPACE/typecheck.log"
+          pnpm run build:lib:host 2>&1 | tee "$GITHUB_WORKSPACE/build-lib-host.log"
           pnpm --dir apps/desktop run check:package 2>&1 | tee "$GITHUB_WORKSPACE/package-preflight.log"
           pnpm --dir apps/desktop run package:linux:x64 2>&1 | tee "$GITHUB_WORKSPACE/package.log"
           ls -lh apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
@@ -224,6 +225,7 @@ jobs:
             patch-apply.log
             dependencies.log
             typecheck.log
+            build-lib-host.log
             package-preflight.log
             package.log
           if-no-files-found: warn
