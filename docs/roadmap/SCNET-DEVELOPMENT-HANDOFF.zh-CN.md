@@ -17,7 +17,8 @@
 - `apply.sh`、本地更新脚本和 `upstream-sync-check` 统一使用 `git apply --3way`，
   直接应用最终迁移差异，避免旧主题补丁在上游变更后的冲突。
 - 迁移补丁在全新 `dsh-v0.2.1-rc.2` 树上以 `git apply --3way` 无冲突应用；
-  `typecheck`、Linux package preflight 和 `.deb` 构建均通过。
+  `typecheck`、host library build、Linux package preflight、`.deb` 构建和已安装 deb
+  session 均通过（Run `39201850282`）。
 
 ### 最新 CI 证据
 
@@ -44,6 +45,9 @@
 - 已发布 `v0.2.1-rc.2-linux.1`，旧 `v0.2.0-rc.2-linux.6` 保留未覆盖。
   新包 SHA-256 为
   `6b9fc27a5ba85c55020b2487584d6fe7dd85d7b782af8a0411d32c968e5d7d00`。
+- 迁移修复后的最新 push 验证 Run `39201850282`：**success**。该 run 证明干净
+  runner 不依赖本机残留 `lib` 输出；工作流先执行 `pnpm run build:lib:host`，再进行
+  Desktop build 和 Linux deb 验收。
 
 ### 当前交接动作
 
@@ -51,6 +55,8 @@
 2. 保持自动迁移默认排除 alpha；只有显式 `--tag` 才允许选择 alpha。
 3. 在正式 SCNet OAuth2/API 合同、issuer、scope、测试账户和凭证提供前，继续保持真实
    登录、刷新、撤销、账户关联和 OpenAPI 查询为阻塞项。
+4. 后续上游 tag 更新由 `upstream-sync-check` 自动检测；若迁移差异、host build 和
+   deb 构建均通过，自动打开 reviewable migration PR，不直接修改 `main` 或发布。
 
 ## 0. 当前总体进度
 
@@ -91,6 +97,8 @@
   发布 Run `38729878217`，验证 Run `38731899365`）
 - [x] 上游 `dsh-v0.2.1-rc.2` Linux 迁移、deb 构建和公开
   `v0.2.1-rc.2-linux.1` 发布；发布资产 SHA-256 已复验
+- [x] 修复干净 runner 的 host library build 顺序和 Linux policy 迁移兼容遗漏；
+  Run `39201850282` 通过
 
 ### M2：OAuth2 / Connector
 
