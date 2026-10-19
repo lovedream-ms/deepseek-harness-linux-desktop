@@ -66,7 +66,7 @@ pnpm install --frozen-lockfile
 ```
 
 脚本会解析最新的非 alpha `dsh-v*` tag（自动排除 `-alpha.N`；手动 `--tag` 可指定任意 tag），获取补丁基线对象后执行 `git apply --3way`，
-再运行依赖安装、typecheck、Linux package preflight 和 `.deb` 构建。构建通过后，
+再运行依赖安装、typecheck、host library build、Linux package preflight 和 `.deb` 构建。构建通过后，
 加上 `--install` 才会安装到当前机器：
 
 ```sh

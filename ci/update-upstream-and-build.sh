@@ -163,6 +163,9 @@ echo "==> Installing dependencies"
 echo "==> Running repository typecheck"
 ( cd "$BUILD_ROOT" && pnpm run typecheck )
 
+echo "==> Building host libraries required by the Desktop bundle"
+( cd "$BUILD_ROOT" && pnpm run build:lib:host )
+
 echo "==> Running Linux package preflight"
 ( cd "$BUILD_ROOT" && pnpm --dir apps/desktop run check:package )
 
