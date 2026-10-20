@@ -80,7 +80,7 @@ index 15e5d8f3..9d20506a 100644
  
  /** Desktop release update state rendered by desktop-owned UI. */
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2dff6042..47a5c161 100644
+index 2dff6042..5fbc2ca0 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -64,6 +64,7 @@ import { DesktopBackgroundNotice } from './background-notice.ts'
@@ -96,13 +96,13 @@ index 2dff6042..47a5c161 100644
      await openScnetDiagnosticsWindow(locale, {
        read: () => readScnetDiagnostics({ profilePath: paths.profile, environment: process.env }),
 +      setup: () => {
-+        openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
++        return openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
 +      },
      })
    })
 +  ipcMain.handle(DESKTOP_IPC.scnetSetup, (event) => {
 +    assertProductSender(event)
-+    openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
++    return openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
 +  })
    ipcMain.handle(DESKTOP_IPC.deviceInfo, (event) => {
      assertProductSender(event)
@@ -123,7 +123,7 @@ index 2dff6042..47a5c161 100644
        void openScnetDiagnosticsWindow(currentDesktopLocale(), {
          read: () => readScnetDiagnostics({ profilePath: paths.profile, environment: process.env }),
 +        setup: () => {
-+          openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
++          return openScnetSetup({ dshRoot: resources.dsh, environment: process.env })
 +        },
        }).catch((error: unknown) => { console.error(error) })
      } },
@@ -335,10 +335,10 @@ index 0c7b7ede..5f86e516 100644
    window.webContents.on('will-navigate', (event) => { event.preventDefault() })
 diff --git a/apps/desktop/src/scnet-setup.ts b/apps/desktop/src/scnet-setup.ts
 new file mode 100644
-index 00000000..c44263d5
+index 00000000..5f802f2b
 --- /dev/null
 +++ b/apps/desktop/src/scnet-setup.ts
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,56 @@
 +/** Launch the bundled SCNet setup wizard in a visible local terminal. */
 +
 +import { existsSync, statSync } from 'node:fs'
@@ -369,7 +369,7 @@ index 00000000..c44263d5
 + * The wizard stores credentials in Secret Service when available and otherwise explains
 + * the supported environment-variable fallback.
 + */
-+export function openScnetSetup(dependencies: ScnetSetupDependencies): void {
++export function openScnetSetup(dependencies: ScnetSetupDependencies): Promise<void> {
 +  const environment = dependencies.environment ?? process.env
 +  const script = scriptPath(dependencies.dshRoot)
 +  if (!existsSync(script)) throw new Error('SCNet setup: bundled setup wizard is unavailable')
@@ -393,10 +393,11 @@ index 00000000..c44263d5
 +    throw new Error('SCNet setup: no supported terminal emulator was found')
 +  }
 +  launch(terminal[0], terminal[1])
++  return Promise.resolve()
 +}
 diff --git a/apps/desktop/tests/scnet-setup.spec.ts b/apps/desktop/tests/scnet-setup.spec.ts
 new file mode 100644
-index 00000000..a6e0bf0f
+index 00000000..83e90510
 --- /dev/null
 +++ b/apps/desktop/tests/scnet-setup.spec.ts
 @@ -0,0 +1,43 @@
@@ -414,7 +415,7 @@ index 00000000..a6e0bf0f
 +    writeFileSync(join(scripts, 'scnet.py'), '')
 +    const launch = vi.fn()
 +    try {
-+      openScnetSetup({
++      void openScnetSetup({
 +        dshRoot,
 +        commandExists: command => command === 'gnome-terminal',
 +        launch,
@@ -435,7 +436,7 @@ index 00000000..a6e0bf0f
 +
 +  it('fails clearly when the bundled wizard is absent', () => {
 +    expect(() => {
-+      openScnetSetup({
++      void openScnetSetup({
 +        dshRoot: '/does-not-exist',
 +        commandExists: () => true,
 +        launch: () => {},
