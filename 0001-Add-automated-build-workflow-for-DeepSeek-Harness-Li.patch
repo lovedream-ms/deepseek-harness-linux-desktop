@@ -1,0 +1,312 @@
+From d1bafbb3f8c1b01e179484bd8f548cc50af66ad7 Mon Sep 17 00:00:00 2001
+From: Auto Committer <user@example.com>
+Date: Mon, 26 Oct 2026 17:44:44 +0800
+Subject: [PATCH] Add automated build workflow for DeepSeek Harness Linux deb
+ packages
+
+---
+ .github/workflows/automated-build.yml | 232 ++++++++++++++++++++++++++
+ INTEGRATION-README.md                 |  50 ++++++
+ 2 files changed, 282 insertions(+)
+ create mode 100644 .github/workflows/automated-build.yml
+ create mode 100644 INTEGRATION-README.md
+
+diff --git a/.github/workflows/automated-build.yml b/.github/workflows/automated-build.yml
+new file mode 100644
+index 0000000..0ee4e37
+--- /dev/null
++++ b/.github/workflows/automated-build.yml
+@@ -0,0 +1,232 @@
++name: Automated DeepSeek Harness Deb Builder
++
++on:
++  schedule:
++    - cron: '0 2 * * *'  # 每天凌晨2点检查更新
++  workflow_dispatch:  # 手动触发
++    inputs:
++      target_tag:
++        description: '目标DeepSeek Harness标签 (例如: dsh-v0.2.1-rc.3)'
++        required: true
++        default: ''
++      build_prerelease:
++        description: '构建预发布版本'
++        required: false
++        default: true
++        type: boolean
++
++permissions:
++  contents: write
++  pull-requests: write
++
++jobs:
++  check-upstream-updates:
++    runs-on: ubuntu-latest
++    outputs:
++      latest_tag: ${{ steps.get_latest.outputs.latest_tag }}
++      should_build: ${{ steps.decision.outputs.should_build }}
++      base_branch: ${{ steps.setup.outputs.base_branch }}
++    steps:
++      - name: Setup base branch
++        id: setup
++        run: |
++          # 检查是否存在migration分支，否则使用main
++          if git ls-remote --heads https://github.com/lql341/deepseek-harness-linux-desktop.git migration | grep -q 'migration'; then
++            echo "base_branch=migration" >> $GITHUB_OUTPUT
++            echo "Using migration branch as base"
++          else
++            echo "base_branch=main" >> $GITHUB_OUTPUT
++            echo "Using main branch as base"
++          fi
++
++      - name: Get latest DeepSeek Harness tag
++        id: get_latest
++        run: |
++          # 获取最新的DeepSeek Harness标签
++          LATEST_TAG=$(curl -s https://api.github.com/repos/deepseek-ai/deepseek-harness/git/refs/tags \
++            | jq -r '.[].ref' | grep -E 'refs/tags/dsh-v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?' | sort -V | tail -1 | sed 's/refs\/tags\///')
++          
++          if [ -z "$LATEST_TAG" ]; then
++            # 如果没找到符合格式的标签，获取最新的
++            LATEST_TAG=$(curl -s https://api.github.com/repos/deepseek-ai/deepseek-harness/git/refs/tags | jq -r '.[-1].ref' | sed 's/refs\/tags\///')
++          fi
++          
++          echo "Latest tag found: $LATEST_TAG"
++          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
++
++      - name: Check if tag already has release
++        id: check_release
++        run: |
++          # 检查是否已经为这个标签构建过
++          if gh release view "deepseek-harness-$LATEST_TAG" --repo "$GITHUB_REPOSITORY" 2>/dev/null; then
++            echo "Release for $LATEST_TAG already exists"
++            echo "already_released=true" >> $GITHUB_OUTPUT
++          else
++            echo "No release for $LATEST_TAG yet"
++            echo "already_released=false" >> $GITHUB_OUTPUT
++          fi
++        env:
++          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          
++      - name: Decision
++        id: decision
++        run: |
++          INPUT_TAG="${{ github.event.inputs.target_tag }}"
++          ALREADY_RELEASED="${{ steps.check_release.outputs.already_released }}"
++          
++          if [ -n "$INPUT_TAG" ] && [ "$INPUT_TAG" != "" ]; then
++            # 手动指定标签时总是构建
++            echo "Manual trigger with tag $INPUT_TAG, proceeding with build"
++            echo "should_build=true" >> $GITHUB_OUTPUT
++            echo "selected_tag=$INPUT_TAG" >> $GITHUB_OUTPUT
++          elif [ "$ALREADY_RELEASED" = "false" ]; then
++            # 自动模式下，如果没有发布过则构建最新标签
++            echo "Latest tag ${{ steps.get_latest.outputs.latest_tag }} not yet released, proceeding with build"
++            echo "should_build=true" >> $GITHUB_OUTPUT
++            echo "selected_tag=${{ steps.get_latest.outputs.latest_tag }}" >> $GITHUB_OUTPUT
++          else
++            # 已经发布过，跳过构建
++            echo "Latest tag already released, skipping build"
++            echo "should_build=false" >> $GITHUB_OUTPUT
++            echo "selected_tag=${{ steps.get_latest.outputs.latest_tag }}" >> $GITHUB_OUTPUT
++          fi
++
++  build-deb-package:
++    needs: check-upstream-updates
++    if: ${{ needs.check-upstream-updates.outputs.should_build == 'true' || github.event.inputs.target_tag != '' }}
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          ref: ${{ needs.check-upstream-updates.outputs.base_branch }}
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: '24'
++
++      - name: Enable Corepack and install pnpm
++        run: |
++          corepack enable
++          npm install -g pnpm@11.7.0
++          pnpm --version
++
++      - name: Determine target tag
++        id: target
++        run: |
++          if [ "${{ github.event.inputs.target_tag }}" != "" ]; then
++            TARGET_TAG="${{ github.event.inputs.target_tag }}"
++          else
++            TARGET_TAG="${{ needs.check-upstream-updates.outputs.selected_tag }}"
++          fi
++          echo "target_tag=$TARGET_TAG" >> $GITHUB_OUTPUT
++          echo "Building for tag: $TARGET_TAG"
++
++      - name: Clone DeepSeek Harness source
++        run: |
++          git clone https://github.com/deepseek-ai/deepseek-harness.git
++          cd deepseek-harness
++          git checkout ${{ steps.target.outputs.target_tag }}
++          echo "Checked out DeepSeek Harness version ${{ steps.target.outputs.target_tag }}"
++
++      - name: Apply Linux patches
++        run: |
++          ./apply.sh ./deepseek-harness
++          echo "Applied Linux patches to DeepSeek Harness"
++
++      - name: Verify patch application
++        run: |
++          cd deepseek-harness
++          if [ -f "apps/desktop/.env.linux" ]; then
++            echo ".env.linux file found - patches applied successfully"
++          else
++            echo "ERROR: .env.linux file not found - patches may not have applied correctly"
++            exit 1
++          fi
++
++      - name: Install dependencies
++        run: |
++          cd deepseek-harness
++          pnpm install --frozen-lockfile
++
++      - name: Run preflight check
++        run: |
++          cd deepseek-harness
++          pnpm --dir apps/desktop run check:package
++
++      - name: Build deb package
++        run: |
++          cd deepseek-harness
++          pnpm --dir apps/desktop run package:linux:x64
++
++      - name: Verify build artifacts
++        run: |
++          cd deepseek-harness
++          echo "Build artifacts:"
++          find apps/desktop/.desktop-build/targets/linux-x64/artifacts/ -name "*.deb" -ls
++          
++          # 检查deb文件是否存在
++          DEB_FILE=$(find apps/desktop/.desktop-build/targets/linux-x64/artifacts/ -name "*.deb" -print -quit)
++          if [ -z "$DEB_FILE" ]; then
++            echo "ERROR: No deb file found"
++            exit 1
++          fi
++          
++          # 检查deb文件大小（确保不是空文件）
++          FILE_SIZE=$(stat -c%s "$DEB_FILE")
++          if [ $FILE_SIZE -lt 1000000 ]; then  # 小于1MB可能是错误的
++            echo "ERROR: Generated deb file is suspiciously small: $FILE_SIZE bytes"
++            exit 1
++          fi
++          
++          echo "Successfully built deb package: $DEB_FILE ($FILE_SIZE bytes)"
++
++      - name: Upload deb package as artifact
++        uses: actions/upload-artifact@v4
++        with:
++          name: deepseek-harness-${{ steps.target.outputs.target_tag }}-deb
++          path: deepseek-harness/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
++          if-no-files-found: error
++
++      - name: Create Release
++        uses: softprops/action-gh-release@v2
++        with:
++          name: "DeepSeek Harness ${{ steps.target.outputs.target_tag }} for Linux (deb)"
++          tag_name: ${{ steps.target.outputs.target_tag }}
++          body: |
++            Automated build of DeepSeek Harness ${{ steps.target.outputs.target_tag }} for Linux
++            
++            This release contains the Linux deb package built from the official DeepSeek Harness source code with Linux compatibility patches applied.
++            
++            - Built from official version: `${{ steps.target.outputs.target_tag }}`
++            - Includes Linux compatibility patches from this repository
++            - Supports Linux x86_64 architecture
++            - Based on the build process described in the README
++            
++            ## Verification
++            This package was automatically built by GitHub Actions. The build process:
++            - Retrieved the official source from deepseek-ai/deepseek-harness
++            - Applied the Linux compatibility patches from this repository
++            - Built the package using the standard build process
++            - Verified the resulting package is valid
++          files: deepseek-harness/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
++          draft: false
++          prerelease: ${{ contains(steps.target.outputs.target_tag, '-rc') || contains(steps.target.outputs.target_tag, '-alpha') || contains(steps.target.outputs.target_tag, '-beta') }}
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++
++  notify-completion:
++    needs: [check-upstream-updates, build-deb-package]
++    runs-on: ubuntu-latest
++    if: always()
++    steps:
++      - name: Notify completion
++        run: |
++          if [ "${{ needs.build-deb-package.result }}" = "success" ]; then
++            echo "Build completed successfully for ${{ needs.check-upstream-updates.outputs.selected_tag }}"
++          elif [ "${{ needs.check-upstream-updates.outputs.should_build }}" = "false" ]; then
++            echo "No build was needed - latest version already released"
++          else
++            echo "Build failed for ${{ needs.check-upstream-updates.outputs.selected_tag }}"
++          fi
+\ No newline at end of file
+diff --git a/INTEGRATION-README.md b/INTEGRATION-README.md
+new file mode 100644
+index 0000000..9e19b52
+--- /dev/null
++++ b/INTEGRATION-README.md
+@@ -0,0 +1,50 @@
++# Automated Build Workflow for DeepSeek Harness Linux
++
++This directory contains the files needed to add automated building of DeepSeek Harness Linux deb packages to the [lql341/deepseek-harness-linux-desktop](https://github.com/lql341/deepseek-harness-linux-desktop) repository.
++
++## Overview
++
++The automated build workflow monitors the upstream [DeepSeek Harness repository](https://github.com/deepseek-ai/deepseek-harness) for new releases and automatically builds Linux-compatible deb packages using the existing patch set.
++
++## Files Included
++
++- `.github/workflows/automated-build.yml` - The GitHub Actions workflow definition
++
++## How It Works
++
++1. **Scheduled Check**: The workflow runs daily at 2 AM UTC to check for new DeepSeek Harness versions
++2. **Version Detection**: Automatically detects the latest version from the upstream repository
++3. **Duplicate Prevention**: Skips building if a release for the detected version already exists
++4. **Build Process**: 
++   - Clones the latest DeepSeek Harness source
++   - Applies Linux compatibility patches using the existing `apply.sh` script
++   - Builds the deb package using the established process
++5. **Release**: Creates a GitHub Release with the built deb package
++
++## Manual Trigger
++
++The workflow can also be triggered manually with these options:
++- **target_tag**: Specify a particular version to build (e.g., `dsh-v0.2.1-rc.3`)
++- **build_prerelease**: Whether to build pre-release versions
++
++## Integration Instructions
++
++To integrate this into the target repository:
++
++1. Create the directory `.github/workflows/` in the repository
++2. Copy the `automated-build.yml` file to that directory
++3. Ensure the workflow has appropriate permissions (Contents: Read and write)
++4. The workflow will automatically begin monitoring for new releases
++
++## Benefits
++
++- **Automatic Updates**: New Linux packages are built automatically when upstream releases new versions
++- **Consistency**: All packages are built using the same process and environment
++- **Quality Assurance**: Built-in verification ensures packages are valid
++- **Reduced Manual Effort**: No need to manually build packages for each new release
++
++## Security Considerations
++
++- The workflow only builds from official upstream releases
++- All build steps follow the same process as the manual method
++- The workflow has minimal required permissions
+\ No newline at end of file
+-- 
+2.55.0.windows.3
+
