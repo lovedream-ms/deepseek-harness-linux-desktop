@@ -1,0 +1,149 @@
+name: Automated DeepSeek Harness Deb Builder
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 每天凌晨2点运行
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version to build (e.g., dsh-v0.2.1-rc.3)'
+        required: true
+        default: ''
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      latest_version: ${{ steps.check.outputs.latest_version }}
+      target_version: ${{ steps.set_version.outputs.target_version }}
+    steps:
+      - name: Determine target version
+        id: set_version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            echo "target_version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "Target version set to: ${{ github.event.inputs.version }}"
+          else
+            # 获取最新版本
+            LATEST=$(curl -s https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest | jq -r '.tag_name')
+            echo "target_version=$LATEST" >> $GITHUB_OUTPUT
+            echo "Latest version: $LATEST"
+          fi
+
+      - name: Check if version already has deb release
+        id: check
+        run: |
+          VERSION="${{ steps.set_version.outputs.target_version }}"
+          
+          # 检查是否已存在对应版本的deb文件
+          if gh release view "$VERSION" --repo lovedream-ms/deepseek-harness-linux-desktop 2>/dev/null; then
+            # 检查该版本的发布中是否包含deb文件
+            if gh release view "$VERSION" --repo lovedream-ms/deepseek-harness-linux-desktop --json assets -q '.assets[] | select(.name | endswith(".deb"))' 2>/dev/null; then
+              echo "Release for $VERSION already exists with deb package"
+              echo "should_build=false" >> $GITHUB_OUTPUT
+            else
+              echo "Release for $VERSION exists but no deb package, will build"
+              echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "latest_version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No release found for $VERSION, will build"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "latest_version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git jq
+
+      - name: Clone Repositories
+        run: |
+          git clone https://github.com/deepseek-ai/deepseek-harness.git
+          git clone https://github.com/lql341/deepseek-harness-linux-desktop.git
+      
+      - name: Checkout Target Version
+        run: |
+          cd deepseek-harness
+          git checkout ${{ needs.check-version.outputs.target_version }}
+      
+      - name: Apply Patches
+        run: |
+          cd deepseek-harness-linux-desktop
+          ./apply.sh ../deepseek-harness
+          cd ../deepseek-harness
+          ls -la
+          ls -la apps/desktop/
+      
+      - name: Install Dependencies
+        run: |
+          cd deepseek-harness
+          pnpm install --frozen-lockfile
+      
+      - name: Build Deb Package
+        run: |
+          cd deepseek-harness
+          pnpm --dir apps/desktop run package:linux:x64
+      
+      - name: Verify Deb Package
+        run: |
+          cd deepseek-harness
+          ls -la apps/desktop/.desktop-build/targets/linux-x64/artifacts/
+          if [ -f "apps/desktop/.desktop-build/targets/linux-x64/artifacts/"*.deb ]; then
+            echo "Deb package successfully created"
+            ls -la apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
+          else
+            echo "ERROR: Deb package was not created"
+            exit 1
+          fi
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: deepseek-harness/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
+
+  release:
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-version.outputs.target_version }}
+          name: "DeepSeek Harness ${{ needs.check-version.outputs.target_version }} for Linux"
+          files: artifacts/*.deb
+          body: |
+            Automated build of DeepSeek Harness ${{ needs.check-version.outputs.target_version }} for Linux x64
+            
+            This release includes:
+            - Linux-compatible build of DeepSeek Harness
+            - Debian package (.deb) for easy installation
+            - All necessary patches for Linux compatibility
+          draft: false
+          prerelease: true
