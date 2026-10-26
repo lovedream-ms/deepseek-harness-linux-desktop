@@ -140,13 +140,20 @@ jobs:
           sha256sum apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb > sha256sum.txt
           cat sha256sum.txt
 
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$UPSTREAM_DIR"/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb \
+             "$GITHUB_WORKSPACE/dist/"
+          cp "$UPSTREAM_DIR"/sha256sum.txt "$GITHUB_WORKSPACE/dist/"
+          ls -lh "$GITHUB_WORKSPACE/dist"
+
       - name: Upload the deb
         uses: actions/upload-artifact@v4
         with:
           name: deb-package
-          path: |
-            ${{ env.UPSTREAM_DIR }}/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
-            ${{ env.UPSTREAM_DIR }}/sha256sum.txt
+          path: ${{ github.workspace }}/dist/*
           if-no-files-found: error
           compression-level: 0
 
@@ -180,11 +187,17 @@ jobs:
           if [ -f dist/sha256sum.txt ]; then
             echo "已附带 sha256sum.txt"
           fi
+          files=$(find dist -type f \( -name '*.deb' -o -name 'sha256sum.txt' \) -print)
+          if [ -z "$files" ]; then
+            echo "::error::dist 里没有 deb/sha256sum.txt"
+            ls -R dist
+            exit 1
+          fi
+          echo "将发布：$files"
           if gh release view "$version" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$version" dist/*.deb dist/sha256sum.txt \
-              -R "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$version" $files -R "$GITHUB_REPOSITORY" --clobber
             gh release edit "$version" -R "$GITHUB_REPOSITORY" --title "$title" --notes "$body"
           else
-            gh release create "$version" dist/*.deb dist/sha256sum.txt \
+            gh release create "$version" $files \
               -R "$GITHUB_REPOSITORY" --title "$title" --notes "$body" --prerelease
           fi
