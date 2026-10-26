@@ -137,8 +137,6 @@ jobs:
           set -euo pipefail
           pnpm --dir apps/desktop run package:linux:x64
           ls -lh apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
-          sha256sum apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb > sha256sum.txt
-          cat sha256sum.txt
 
       - name: Collect artifacts
         run: |
@@ -146,8 +144,10 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$UPSTREAM_DIR"/apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb \
              "$GITHUB_WORKSPACE/dist/"
-          cp "$UPSTREAM_DIR"/sha256sum.txt "$GITHUB_WORKSPACE/dist/"
+          # 校验文件只记文件名，方便下载后直接 `sha256sum -c sha256sum.txt`
+          ( cd "$GITHUB_WORKSPACE/dist" && sha256sum *.deb > sha256sum.txt )
           ls -lh "$GITHUB_WORKSPACE/dist"
+          cat "$GITHUB_WORKSPACE/dist/sha256sum.txt"
 
       - name: Upload the deb
         uses: actions/upload-artifact@v4
